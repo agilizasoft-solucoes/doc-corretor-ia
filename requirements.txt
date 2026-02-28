@@ -1,4 +1,2 @@
 streamlit
-requests
-PyPDF2
-img2pdf
+google-generativeai>=0.8.0
