@@ -20,29 +20,170 @@ from pathlib import Path
 # ══════════════════════════════════════════════════════
 
 # ══════════════════════════════════════════════════════
-# LOGIN — CONTROLE DE ACESSO
+# LOGIN — SUPABASE
 # ══════════════════════════════════════════════════════
 
-SENHA_ACESSO = "corretor2025"  # ← troque pela senha que quiser
+SUPABASE_URL    = "https://ryvgqesflxbtqbdhspdy.supabase.co"
+SUPABASE_KEY    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dmdxZXNmbHhidHFiZGhzcGR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyOTIyMjMsImV4cCI6MjA4Nzg2ODIyM30.HhW3_bSQ8fZvY17XTwerhXdW7hF2uf3gKUSYm9ixkys"
+SB_HEADERS      = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
+EMAIL_REMETENTE = "daniellaandrade1989@gmail.com"
+EMAIL_SENHA_APP = "fpupijekoocowhcl"
+APP_URL_CLIENTE = "https://doc-corretor-ia.streamlit.app"  # ← URL do app cliente
+
+import smtplib
+import secrets
+from datetime import timezone
+from email.mime.text import MIMEText as _MIMEText
+from email.mime.multipart import MIMEMultipart as _MIMEMultipart
+
+def buscar_cliente(login, senha):
+    url = f"{SUPABASE_URL}/rest/v1/clientes?login=eq.{login}&senha=eq.{senha}&select=*"
+    r = requests.get(url, headers=SB_HEADERS)
+    dados = r.json()
+    return dados[0] if dados else None
+
+def buscar_cliente_por_email(email):
+    url = f"{SUPABASE_URL}/rest/v1/clientes?email=eq.{email}&select=*"
+    r = requests.get(url, headers=SB_HEADERS)
+    dados = r.json()
+    return dados[0] if dados else None
+
+def registrar_acesso(cliente):
+    url = f"{SUPABASE_URL}/rest/v1/acessos"
+    requests.post(url, headers={**SB_HEADERS,"Content-Type":"application/json"},
+                  json={"cliente_id": cliente["id"], "cliente_nome": cliente["nome"],
+                        "cliente_login": cliente["login"]})
+
+def registrar_uso(cliente, qtd_arquivos=0, email_enviado=False):
+    url = f"{SUPABASE_URL}/rest/v1/usos"
+    requests.post(url, headers={**SB_HEADERS,"Content-Type":"application/json"},
+                  json={"cliente_id": cliente["id"], "cliente_nome": cliente["nome"],
+                        "cliente_login": cliente["login"], "qtd_arquivos": qtd_arquivos,
+                        "email_enviado": email_enviado})
+
+def criar_token_cliente(cliente_id):
+    token  = secrets.token_urlsafe(32)
+    expira = (datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat()
+    url    = f"{SUPABASE_URL}/rest/v1/tokens_recuperacao"
+    requests.post(url, headers={**SB_HEADERS,"Content-Type":"application/json"},
+                  json={"tipo":"cliente","referencia":cliente_id,
+                        "token":token,"usado":False,"expira_em":expira})
+    return token
+
+def validar_token_cliente(token):
+    url = f"{SUPABASE_URL}/rest/v1/tokens_recuperacao?token=eq.{token}&usado=eq.false&select=*"
+    r   = requests.get(url, headers=SB_HEADERS)
+    if r.status_code != 200: return None
+    dados = r.json()
+    if not dados: return None
+    rec    = dados[0]
+    expira = datetime.fromisoformat(rec["expira_em"])
+    if expira.tzinfo is None:
+        expira = expira.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) > expira: return None
+    return rec
+
+def marcar_token_cliente_usado(token_id):
+    url = f"{SUPABASE_URL}/rest/v1/tokens_recuperacao?id=eq.{token_id}"
+    requests.patch(url, headers={**SB_HEADERS,"Content-Type":"application/json"},
+                   json={"usado": True})
+
+def alterar_senha_cliente(cliente_id, nova_senha):
+    url = f"{SUPABASE_URL}/rest/v1/clientes?id=eq.{cliente_id}"
+    requests.patch(url, headers={**SB_HEADERS,"Content-Type":"application/json"},
+                   json={"senha": nova_senha})
+
+def enviar_link_recuperacao(email_destino, token):
+    link = f"{APP_URL_CLIENTE}?token={token}"
+    html = f"""
+    <h2>DocCorretor IA — Recuperação de Senha</h2>
+    <p>Clique no link abaixo para redefinir sua senha.<br>
+    O link expira em <strong>30 minutos</strong>.</p>
+    <a href="{link}" style="background:#1976d2;color:#fff;padding:12px 24px;
+    border-radius:6px;text-decoration:none;font-size:16px;">🔑 Redefinir Senha</a>
+    <p style="color:#888;font-size:12px;">Se não solicitou, ignore este email.</p>
+    """
+    msg = _MIMEMultipart("alternative")
+    msg["From"]    = EMAIL_REMETENTE
+    msg["To"]      = email_destino
+    msg["Subject"] = "DocCorretor IA — Recuperação de Senha"
+    msg.attach(_MIMEText(html, "html", "utf-8"))
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
+        s.login(EMAIL_REMETENTE, EMAIL_SENHA_APP)
+        s.sendmail(EMAIL_REMETENTE, email_destino, msg.as_bytes())
 
 def check_login():
+    from datetime import date as _date
+    params    = st.query_params
+    token_url = params.get("token", "")
+
+    # ── Redefinição via link ──
+    if token_url and not st.session_state.get("autenticado"):
+        st.set_page_config(page_title="DocCorretor IA", page_icon="📁", layout="centered")
+        st.markdown("<style>section[data-testid='stMain'] > div{max-width:420px;margin:70px auto;}</style>",
+                    unsafe_allow_html=True)
+        st.markdown("## 🗂️ DocCorretor IA")
+        st.markdown("#### Redefinir senha")
+        st.divider()
+        rec = validar_token_cliente(token_url)
+        if not rec or rec.get("tipo") != "cliente":
+            st.error("❌ Link inválido ou expirado. Solicite um novo na tela de login.")
+            st.stop()
+        nova1 = st.text_input("Nova senha", type="password")
+        nova2 = st.text_input("Confirme a nova senha", type="password")
+        if st.button("✅ Salvar nova senha", use_container_width=True, type="primary"):
+            if not nova1 or len(nova1) < 6:
+                st.error("Senha deve ter pelo menos 6 caracteres.")
+            elif nova1 != nova2:
+                st.error("As senhas não coincidem.")
+            else:
+                alterar_senha_cliente(rec["referencia"], nova1)
+                marcar_token_cliente_usado(rec["id"])
+                st.success("✅ Senha redefinida com sucesso! Faça login normalmente.")
+                st.query_params.clear()
+        st.stop()
+
+    # ── Login normal ──
     if not st.session_state.get("autenticado", False):
         st.set_page_config(page_title="DocCorretor IA", page_icon="📁", layout="centered")
-        st.markdown("""
-        <style>
-        section[data-testid="stMain"] > div { max-width: 400px; margin: 80px auto; }
-        </style>
-        """, unsafe_allow_html=True)
+        st.markdown("<style>section[data-testid='stMain'] > div{max-width:420px;margin:70px auto;}</style>",
+                    unsafe_allow_html=True)
         st.markdown("## 🗂️ DocCorretor IA")
         st.caption("Sistema de organização de documentos para financiamento")
         st.divider()
-        senha = st.text_input("🔑 Senha de acesso", type="password")
-        if st.button("Entrar", use_container_width=True, type="primary"):
-            if senha == SENHA_ACESSO:
-                st.session_state["autenticado"] = True
-                st.rerun()
-            else:
-                st.error("Senha incorreta. Tente novamente.")
+        tela = st.radio("", ["🔑 Entrar", "🔓 Esqueci minha senha"], horizontal=True, label_visibility="collapsed")
+
+        if tela == "🔑 Entrar":
+            login = st.text_input("👤 Login")
+            senha = st.text_input("🔑 Senha", type="password")
+            if st.button("Entrar", use_container_width=True, type="primary"):
+                cliente = buscar_cliente(login.strip(), senha.strip())
+                if not cliente:
+                    st.error("Login ou senha incorretos.")
+                elif not cliente.get("ativo"):
+                    st.error("❌ Acesso bloqueado. Entre em contato com o suporte.")
+                elif _date.fromisoformat(cliente["data_vencimento"]) < _date.today():
+                    st.error("❌ Sua assinatura venceu. Entre em contato para renovar.")
+                else:
+                    st.session_state["autenticado"] = True
+                    st.session_state["cliente"]     = cliente
+                    registrar_acesso(cliente)
+                    st.rerun()
+
+        else:
+            st.info("Digite o email cadastrado na sua conta.")
+            email_rec = st.text_input("📧 Email cadastrado")
+            if st.button("📧 Enviar link de recuperação", use_container_width=True, type="primary"):
+                cliente = buscar_cliente_por_email(email_rec.strip())
+                if not cliente:
+                    st.error("Email não encontrado. Verifique ou entre em contato com o suporte.")
+                else:
+                    try:
+                        token = criar_token_cliente(cliente["id"])
+                        enviar_link_recuperacao(email_rec.strip(), token)
+                        st.success(f"✅ Link enviado para {email_rec}! Verifique sua caixa de entrada. O link expira em 30 minutos.")
+                    except Exception as e:
+                        st.error(f"❌ Erro ao enviar email: {e}")
         st.stop()
 
 check_login()
@@ -457,11 +598,15 @@ st.divider()
 
 # ── Configurações de email (sidebar — salvas na sessão) ──
 with st.sidebar:
+    cliente = st.session_state.get("cliente", {})
+    st.markdown(f"### 👤 {cliente.get('nome','')}")
+    st.caption(f"Plano: {cliente.get('plano','').capitalize()} | Vence: {cliente.get('data_vencimento','')}")
+    st.divider()
     st.header("⚙️ Configurações de Envio")
     st.caption("Preencha uma vez — fica salvo enquanto o app estiver aberto.")
     cfg_destino   = st.text_input("📧 Email destino",  value=st.session_state.get("cfg_destino",""),  placeholder="destinatario@email.com")
-    cfg_remetente = st.text_input("📤 Seu Gmail",      value=st.session_state.get("cfg_remetente",""),placeholder="seuemail@gmail.com")
-    cfg_senha     = st.text_input("🔑 Senha de app",   value=st.session_state.get("cfg_senha",""),    type="password", placeholder="Senha de app Gmail")
+    cfg_remetente = st.text_input("📤 Seu Gmail",      value=st.session_state.get("cfg_remetente", cliente.get("gmail_remetente","")), placeholder="seuemail@gmail.com")
+    cfg_senha     = st.text_input("🔑 Senha de app",   value=st.session_state.get("cfg_senha", cliente.get("gmail_senha_app","")),    type="password", placeholder="Senha de app Gmail")
     if st.button("💾 Salvar configuração"):
         st.session_state["cfg_destino"]   = cfg_destino
         st.session_state["cfg_remetente"] = cfg_remetente
@@ -469,6 +614,11 @@ with st.sidebar:
         st.success("✅ Configuração salva!")
     st.divider()
     st.caption("💡 Senha de app ≠ senha do Gmail\nmyaccount.google.com → Segurança → Senhas de app")
+    st.divider()
+    if st.button("🚪 Sair", use_container_width=True):
+        for k in ["autenticado","cliente","cfg_destino","cfg_remetente","cfg_senha","pdfs_gerados","email_gerado","processado"]:
+            st.session_state.pop(k, None)
+        st.rerun()
 
 # ── PASSO 1: Upload ──
 st.subheader("📂 Passo 1 — Upload dos documentos")
@@ -516,6 +666,10 @@ if processar:
         st.session_state["pdfs_gerados"] = pdfs_gerados
         st.session_state["email_gerado"] = gerado
         st.session_state["processado"]   = True
+        # Registra uso no Supabase
+        cliente_sess = st.session_state.get("cliente")
+        if cliente_sess:
+            registrar_uso(cliente_sess, qtd_arquivos=len(arquivos_bytes))
 
 # ── Resultados (aparecem após processar) ──
 if st.session_state.get("processado"):
@@ -623,6 +777,9 @@ if st.session_state.get("processado"):
                         barra_env.progress(100, text="✅ Email enviado!")
                         _t.sleep(0.5); barra_env.empty()
                         st.success(f"✅ Email enviado para {destino} com {len(selecionados)} arquivo(s)!")
+                        cliente_sess = st.session_state.get("cliente")
+                        if cliente_sess:
+                            registrar_uso(cliente_sess, qtd_arquivos=len(selecionados), email_enviado=True)
                     except smtplib.SMTPAuthenticationError:
                         st.error("❌ Autenticação falhou! Use senha de APP do Gmail.\nmyaccount.google.com → Segurança → Senhas de app")
                     except Exception as e:
