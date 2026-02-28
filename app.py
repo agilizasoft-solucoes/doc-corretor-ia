@@ -37,10 +37,19 @@ from email.mime.text import MIMEText as _MIMEText
 from email.mime.multipart import MIMEMultipart as _MIMEMultipart
 
 def buscar_cliente(login, senha):
-    url = f"{SUPABASE_URL}/rest/v1/clientes?login=eq.{login}&senha=eq.{senha}&select=*"
+    # Busca só pelo login e verifica a senha no Python (evita problema com # e caracteres especiais na URL)
+    url = f"{SUPABASE_URL}/rest/v1/clientes?login=eq.{login}&select=*"
     r = requests.get(url, headers=SB_HEADERS)
+    if r.status_code != 200:
+        return None
     dados = r.json()
-    return dados[0] if dados else None
+    if not dados:
+        return None
+    cliente = dados[0]
+    # Verifica senha localmente
+    if cliente.get("senha","").strip() == senha.strip():
+        return cliente
+    return None
 
 def buscar_cliente_por_email(email):
     url = f"{SUPABASE_URL}/rest/v1/clientes?email=eq.{email}&select=*"
