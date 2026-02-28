@@ -383,17 +383,18 @@ def main():
         # ── ETAPA 3: envio ────────────────────────────────────────────────────
         st.markdown("---\n### 📬 Etapa 3 — Envio")
         with st.expander("⚙️ Configurações de email (salvas automaticamente)", expanded=not cfg["destinatario"]):
-            dest_in = st.text_input("📧 Email destino (quem recebe)", value=cfg["destinatario"])
-            rem_in  = st.text_input("📤 Seu Gmail (remetente)", value=cfg["remetente"])
-            sen_in  = st.text_input("🔑 Senha de app Gmail", value=cfg["senha_app"], type="password")
+            dest_in_tmp = st.text_input("📧 Email destino (quem recebe)", value=cfg["destinatario"])
+            rem_in_tmp  = st.text_input("📤 Seu Gmail (remetente)", value=cfg["remetente"])
+            sen_in_tmp  = st.text_input("🔑 Senha de app Gmail", value=cfg["senha_app"], type="password")
             if st.button("💾 Salvar configurações"):
-                cfg = {"destinatario": dest_in, "remetente": rem_in, "senha_app": sen_in}
+                cfg = {"destinatario": dest_in_tmp, "remetente": rem_in_tmp, "senha_app": sen_in_tmp}
                 salvar_config(cfg)
                 st.success("✅ Configurações salvas!")
-        else:
-            dest_in = cfg["destinatario"]
-            rem_in  = cfg["remetente"]
-            sen_in  = cfg["senha_app"]
+                st.rerun()
+
+        dest_in = cfg["destinatario"]
+        rem_in  = cfg["remetente"]
+        sen_in  = cfg["senha_app"]
 
         col1, col2, col3 = st.columns(3)
 
