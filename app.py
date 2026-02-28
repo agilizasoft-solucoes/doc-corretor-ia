@@ -121,10 +121,25 @@ def enviar_link_recuperacao(email_destino, token):
         s.login(EMAIL_REMETENTE, EMAIL_SENHA_APP)
         s.sendmail(EMAIL_REMETENTE, email_destino, msg.as_bytes())
 
+SESSAO_CLIENTE_TOKEN = "sessao_cliente_ativa_2025"
+
 def check_login():
     from datetime import date as _date
     params    = st.query_params
     token_url = params.get("token", "")
+    sessao    = params.get("s", "")
+
+    # ── Restaura sessão via query param após F5 ──
+    if sessao == SESSAO_CLIENTE_TOKEN and not st.session_state.get("autenticado"):
+        login_salvo = params.get("u", "")
+        if login_salvo:
+            url = f"{SUPABASE_URL}/rest/v1/clientes?login=eq.{login_salvo}&select=*"
+            r   = requests.get(url, headers=SB_HEADERS)
+            if r.status_code == 200 and r.json():
+                cliente = r.json()[0]
+                if cliente.get("ativo") and _date.fromisoformat(cliente["data_vencimento"]) >= _date.today():
+                    st.session_state["autenticado"] = True
+                    st.session_state["cliente"]     = cliente
 
     # ── Redefinição via link ──
     if token_url and not st.session_state.get("autenticado"):
@@ -176,6 +191,8 @@ def check_login():
                 else:
                     st.session_state["autenticado"] = True
                     st.session_state["cliente"]     = cliente
+                    st.query_params["s"] = SESSAO_CLIENTE_TOKEN
+                    st.query_params["u"] = cliente["login"]
                     registrar_acesso(cliente)
                     st.rerun()
 
@@ -627,6 +644,7 @@ with st.sidebar:
     if st.button("🚪 Sair", use_container_width=True):
         for k in ["autenticado","cliente","cfg_destino","cfg_remetente","cfg_senha","pdfs_gerados","email_gerado","processado"]:
             st.session_state.pop(k, None)
+        st.query_params.clear()
         st.rerun()
 
 # ── PASSO 1: Upload ──
