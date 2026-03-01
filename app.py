@@ -294,12 +294,27 @@ components.html("""
                 p = p.parentElement;
             }
         });
-        // Elementos com posição fixa no canto (badge)
-        doc.querySelectorAll('div').forEach(el => {
-            const s = window.parent.getComputedStyle(el);
-            if(s.position === 'fixed' && (parseInt(s.bottom) < 100) && (parseInt(s.right) < 100)) {
-                el.style.setProperty('display','none','important');
-            }
+        // Badge Streamlit Cloud e avatar do criador (seletores exatos do inspetor)
+        [
+            'a[href="https://streamlit.io/cloud"]',
+            'a[href*="streamlit.io/cloud"]',
+            '[class*="_viewerBadge"]',
+            '[class*="_profileContainer"]',
+            '[class*="_profilePreview"]',
+            '[data-testid="appCreatorAvatar"]',
+            'a[href*="share.streamlit.io/user"]',
+            'img[alt="App Creator Avatar"]',
+        ].forEach(s => {
+            doc.querySelectorAll(s).forEach(el => {
+                // Sobe até o container pai e esconde
+                let p = el;
+                for(let i = 0; i < 5; i++) {
+                    if(p && p !== doc.body) {
+                        p.style.setProperty('display','none','important');
+                        p = p.parentElement;
+                    }
+                }
+            });
         });
     }
     hideMenu();
