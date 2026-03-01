@@ -228,12 +228,21 @@ st.markdown("""
     .checklist-aviso { color: #e65100; font-weight: bold; }
 
     /* Esconder menu hamburguer, botão Fork e GitHub */
-    #MainMenu { visibility: hidden !important; }
-    header[data-testid="stHeader"] { visibility: hidden !important; }
-    footer { visibility: hidden !important; }
+    #MainMenu { visibility: hidden !important; display: none !important; }
+    header { visibility: hidden !important; }
+    header[data-testid="stHeader"] { visibility: hidden !important; display: none !important; }
+    footer { visibility: hidden !important; display: none !important; }
     .stDeployButton { display: none !important; }
-    [data-testid="stToolbar"] { display: none !important; }
-    [data-testid="stDecoration"] { display: none !important; }
+    [data-testid="stToolbar"] { display: none !important; visibility: hidden !important; }
+    [data-testid="stDecoration"] { display: none !important; visibility: hidden !important; }
+    [data-testid="stStatusWidget"] { display: none !important; }
+    [data-testid="manage-app-button"] { display: none !important; }
+    .st-emotion-cache-zq5wmm { display: none !important; }
+    .st-emotion-cache-1dp5vir { display: none !important; }
+    .viewerBadge_container__r5tak { display: none !important; }
+    .styles_viewerBadge__CvC9N { display: none !important; }
+    #stDecoration { display: none !important; }
+    div[data-testid="collapsedControl"] { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
