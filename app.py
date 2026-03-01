@@ -226,6 +226,14 @@ st.markdown("""
     .checklist-ok    { color: #2e7d32; font-weight: bold; }
     .checklist-falta { color: #c62828; font-weight: bold; }
     .checklist-aviso { color: #e65100; font-weight: bold; }
+
+    /* Esconder menu hamburguer, botão Fork e GitHub */
+    #MainMenu { visibility: hidden !important; }
+    header[data-testid="stHeader"] { visibility: hidden !important; }
+    footer { visibility: hidden !important; }
+    .stDeployButton { display: none !important; }
+    [data-testid="stToolbar"] { display: none !important; }
+    [data-testid="stDecoration"] { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
