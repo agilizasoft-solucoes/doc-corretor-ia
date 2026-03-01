@@ -241,7 +241,6 @@ st.markdown("""
     .styles_viewerBadge__CvC9N { display: none !important; }
     #stDecoration { display: none !important; }
     div[data-testid="collapsedControl"] { display: none !important; }
-    /* Streamlit Cloud badge */
     [class*="viewerBadge"] { display: none !important; }
     [class*="toolbarActions"] { display: none !important; }
     [class*="ActionButton"] { display: none !important; }
@@ -249,41 +248,39 @@ st.markdown("""
     button[title="Open settings"] { display: none !important; }
     button[title="Manage app"] { display: none !important; }
 </style>
+""", unsafe_allow_html=True)
+
+# Injeta JS via iframe para escapar da sandbox do Streamlit e esconder menu/header/footer
+import streamlit.components.v1 as components
+components.html("""
 <script>
-    // Remove elementos do menu do Streamlit via JavaScript
-    function hideStreamlitMenu() {
-        // Seletores de elementos a remover
-        const selectors = [
-            'header[data-testid="stHeader"]',
-            '#MainMenu',
-            'footer',
+    function hideMenu() {
+        const win = window.parent;
+        const doc = win.document;
+        const sels = [
+            'header', '#MainMenu', 'footer',
             '[data-testid="stToolbar"]',
             '[data-testid="stDecoration"]',
             '[data-testid="stStatusWidget"]',
             '[data-testid="manage-app-button"]',
             '.stDeployButton',
-            '[class*="viewerBadge"]',
-            '[class*="toolbarActions"]',
         ];
-        selectors.forEach(sel => {
-            document.querySelectorAll(sel).forEach(el => {
-                el.style.display = 'none';
-                el.style.visibility = 'hidden';
-            });
-        });
-        // Remove botões do toolbar pelo título
-        ['Open settings','Manage app','View app in Streamlit Community Cloud','Fork'].forEach(title => {
-            document.querySelectorAll(`button[title="${title}"], a[title="${title}"]`).forEach(el => {
-                el.style.display = 'none';
+        sels.forEach(s => doc.querySelectorAll(s).forEach(el => {
+            el.style.setProperty('display','none','important');
+            el.style.setProperty('visibility','hidden','important');
+        }));
+        ['Open settings','Manage app','View app in Streamlit Community Cloud','Fork'].forEach(t => {
+            doc.querySelectorAll(`button[title="${t}"],a[title="${t}"]`).forEach(el => {
+                el.style.setProperty('display','none','important');
             });
         });
     }
-    // Roda imediatamente e também observa mudanças no DOM
-    hideStreamlitMenu();
-    const observer = new MutationObserver(hideStreamlitMenu);
-    observer.observe(document.body, { childList: true, subtree: true });
+    hideMenu();
+    new MutationObserver(hideMenu).observe(
+        window.parent.document.body, {childList:true, subtree:true}
+    );
 </script>
-""", unsafe_allow_html=True)
+""", height=0)
 
 # ══════════════════════════════════════════════════════
 # CHAVES API — lidas dos Secrets do Streamlit
