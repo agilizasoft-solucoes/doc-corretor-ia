@@ -247,6 +247,13 @@ st.markdown("""
     button[title="View app in Streamlit Community Cloud"] { display: none !important; }
     button[title="Open settings"] { display: none !important; }
     button[title="Manage app"] { display: none !important; }
+    /* Badge inferior direito */
+    a[href*="streamlit.io"] { display: none !important; }
+    img[src*="streamlit"] { display: none !important; }
+    [class*="badge"] { display: none !important; }
+    [class*="Badge"] { display: none !important; }
+    div[style*="position: fixed"] { display: none !important; }
+    div[style*="position:fixed"] { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -255,8 +262,7 @@ import streamlit.components.v1 as components
 components.html("""
 <script>
     function hideMenu() {
-        const win = window.parent;
-        const doc = win.document;
+        const doc = window.parent.document;
         const sels = [
             'header', '#MainMenu', 'footer',
             '[data-testid="stToolbar"]',
@@ -270,9 +276,30 @@ components.html("""
             el.style.setProperty('visibility','hidden','important');
         }));
         ['Open settings','Manage app','View app in Streamlit Community Cloud','Fork'].forEach(t => {
-            doc.querySelectorAll(`button[title="${t}"],a[title="${t}"]`).forEach(el => {
+            doc.querySelectorAll('button[title="'+t+'"],a[title="'+t+'"]').forEach(el => {
                 el.style.setProperty('display','none','important');
             });
+        });
+        // Esconder badge inferior direito (icone do Streamlit)
+        doc.querySelectorAll('a[href*="streamlit"]').forEach(el => {
+            el.style.setProperty('display','none','important');
+        });
+        doc.querySelectorAll('img[src*="streamlit"]').forEach(el => {
+            let p = el.parentElement;
+            while(p && p !== doc.body) {
+                if(p.tagName === 'A' || p.style.position === 'fixed') {
+                    p.style.setProperty('display','none','important');
+                    break;
+                }
+                p = p.parentElement;
+            }
+        });
+        // Elementos com posição fixa no canto (badge)
+        doc.querySelectorAll('div').forEach(el => {
+            const s = window.parent.getComputedStyle(el);
+            if(s.position === 'fixed' && (parseInt(s.bottom) < 100) && (parseInt(s.right) < 100)) {
+                el.style.setProperty('display','none','important');
+            }
         });
     }
     hideMenu();
