@@ -311,53 +311,60 @@ RETORNE APENAS JSON:
 # BLOCO 4 — GERAÇÃO DO EMAIL
 # ══════════════════════════════════════════════════════
 
+def fmt_brl(valor):
+    """Formata número para R$ brasileiro."""
+    try:
+        v = float(str(valor).replace(",",".").replace("R$","").replace(" ","").strip())
+        return f"R$ {v:,.2f}".replace(",","X").replace(".",",").replace("X",".")
+    except:
+        return str(valor)
+
 def gerar_email(texto_bruto, dados, pdfs_selecionados):
+    """Monta o texto diretamente — sem passar pelo Gemini — garantindo campos obrigatórios."""
+    hora = datetime.now(timezone(timedelta(hours=-3))).hour
+    if 6 <= hora < 12:   saudacao = "Bom dia"
+    elif 12 <= hora < 18: saudacao = "Boa tarde"
+    else:                 saudacao = "Boa noite"
+
+    nome_dest    = dados.get("nome_destinatario","").strip()
+    saudacao_txt = f"{saudacao}, {nome_dest}." if nome_dest else f"{saudacao}."
+    nome_cliente = dados.get("nome_completo","a cliente").split()[0] if dados.get("nome_completo") else "a cliente"
+
+    valor_imovel = dados.get("valor_imovel","")
+    if valor_imovel and not str(valor_imovel).startswith("R$"):
+        valor_imovel = fmt_brl(valor_imovel)
+    tipo_imovel = dados.get("tipo_imovel","")
+    ctx_imovel  = f" de imóvel {tipo_imovel} no valor de {valor_imovel}" if valor_imovel else ""
+
+    assunto = f"Documentação {nome_cliente}"
+    if tipo_imovel:  assunto += f" — Imóvel {tipo_imovel.capitalize()}"
+    if valor_imovel: assunto += f" {valor_imovel}"
+
     campos = []
-    # Email — sempre aparece, em branco se não encontrado
-    if dados.get("email"):
-        campos.append(f"• 📧 E-mail: {dados['email']}")
-    else:
-        campos.append("• 📧 E-mail: ")
-    # Telefone — sempre aparece, em branco se não encontrado
-    if dados.get("telefone"):
-        campos.append(f"• 📱 Telefone: {dados['telefone']}")
-    else:
-        campos.append("• 📱 Telefone: ")
-    if dados.get("nit_pis_nis"): campos.append(f"• 🪪 NIT/PIS/NIS: {dados['nit_pis_nis']}")
+    # NIT/PIS/NIS — sempre aparece, em branco se não encontrado
+    campos.append(f"• 🪪 NIT/PIS/NIS: {dados.get('nit_pis_nis','')}")
+    # Renda
     if dados.get("renda_valor"):
-        tipo = dados.get("renda_tipo",""); prof = dados.get("renda_profissao","")
-        det  = f" ({tipo} – {prof})" if tipo or prof else ""
-        # Garantir formatação R$
-        renda = dados['renda_valor']
-        if renda and not str(renda).startswith("R$"):
-            try: renda = f"R$ {float(str(renda).replace(',','.').replace('R$','').strip()):,.2f}".replace(",","X").replace(".",",").replace("X",".")
-            except: renda = f"R$ {renda}"
+        renda = dados["renda_valor"]
+        if not str(renda).startswith("R$"): renda = fmt_brl(renda)
+        tipo  = dados.get("renda_tipo",""); prof = dados.get("renda_profissao","")
+        det   = f" ({tipo})" if tipo else ""
         campos.append(f"• 💰 Renda mensal: {renda}{det}")
+    # Carteira
     if str(dados.get("nunca_trabalhou_carteira","")).lower() in ("true","sim","yes","1"):
         campos.append("• Nunca trabalhou de carteira assinada")
-    if dados.get("dependentes"):  campos.append(f"• Possui {dados['dependentes']} dependente(s)")
-    # CPF, estado_civil e observacoes removidos — não vão para o email
+    # Dependentes
+    if dados.get("dependentes"):
+        campos.append(f"• Possui {dados['dependentes']} dependente(s)")
+    # Contato — SEMPRE aparecem, em branco se não encontrado
+    campos.append(f"• 📧 E-mail: {dados.get('email','')}")
+    campos.append(f"• 📱 Telefone: {dados.get('telefone','')}")
 
-    campos_str   = "\n".join(campos) if campos else "[dados não identificados]"
-    nome_cliente = dados.get("nome_completo","a cliente").split()[0] if dados.get("nome_completo") else "a cliente"
-    # Destinatário: usar SOMENTE o nome_destinatario do campo de texto, nunca nomes dos documentos
-    nome_dest    = dados.get("nome_destinatario","").strip()
-    saudacao     = f"Boa tarde, {nome_dest}." if nome_dest else "Boa tarde."
-    valor_imovel = dados.get("valor_imovel","")
-    # Garantir formatação R$ no valor do imóvel
-    if valor_imovel and not str(valor_imovel).startswith("R$"):
-        try: valor_imovel = f"R$ {float(str(valor_imovel).replace(',','.').replace('R$','').strip()):,.2f}".replace(",","X").replace(".",",").replace("X",".")
-        except: valor_imovel = f"R$ {valor_imovel}"
-    tipo_imovel  = dados.get("tipo_imovel","")
-    ctx_imovel   = f" de imóvel {tipo_imovel} no valor de {valor_imovel}" if valor_imovel else ""
-    docs_lista   = "\n".join([f"- {n}" for n,_ in pdfs_selecionados])
+    campos_str = "\n".join(campos)
 
-    prompt = f"""
-Gere um email profissional CURTO e direto seguindo EXATAMENTE este modelo:
+    return f"""Assunto: {assunto}
 
-Assunto: [objetivo claro em até 10 palavras]
-
-{saudacao}
+{saudacao_txt}
 
 Conforme simulação realizada, segue documentação da cliente {nome_cliente} para aprovação de financiamento{ctx_imovel}.
 
@@ -368,18 +375,7 @@ Informações da cliente:
 Solicito, por gentileza, aprovação conforme simulação encaminhada.
 
 Fico no aguardo do retorno.
-Obrigada.
-
-REGRAS: Use o modelo acima. Não adicione parágrafos extras. Remova campos vazios. NÃO invente nada.
-DADOS: {json.dumps(dados, ensure_ascii=False)}
-TEXTO ORIGINAL: {texto_bruto}
-DOCUMENTOS ANEXADOS: {docs_lista}
-
-RETORNE APENAS O EMAIL.
-"""
-    try:
-        return chamar_gemini([{"text": prompt}]).strip()
-    except: return ""
+Obrigada."""
 
 
 # ══════════════════════════════════════════════════════
@@ -603,22 +599,22 @@ if st.session_state.get("processado"):
 
     # ── Botão copiar texto ──
     texto_completo = f"Assunto: {assunto_edit}\n\n{corpo_edit}"
-    st.components.v1.html(f"""
-    <button onclick="navigator.clipboard.writeText({json.dumps(texto_completo)});this.innerText='✅ Copiado!';setTimeout(()=>this.innerText='📋 Copiar texto',2000);"
-        style="width:100%;padding:10px;background:#1976d2;color:white;border:none;border-radius:6px;font-size:15px;cursor:pointer;margin-top:4px;">
-        📋 Copiar texto
-    </button>
-    """, height=50)
+    if st.button("📋 Copiar texto", use_container_width=True):
+        st.code(texto_completo, language=None)
+        st.caption("☝️ Selecione o texto acima e copie com Ctrl+C / Cmd+C")
 
     st.divider()
 
     # ── ETAPA 3: Envio ──
     st.subheader("📬 Etapa 3 — Enviar por email")
-    st.caption("Configure o email destino e seu Gmail na barra lateral antes de enviar.")
 
-    col_exec, col_cancel = st.columns([1,1])
+    cliente_sess = st.session_state.get("cliente", {})
+    is_pro = cliente_sess.get("plano","free") == "pro"
 
-    with col_exec:
+    if not is_pro:
+        st.info("📧 **Envio por email disponível apenas no plano PRO.**\nBaixe os arquivos pelo botão ZIP acima e envie manualmente.")
+    else:
+        st.caption("Configure o email destino e seu Gmail na barra lateral antes de enviar.")
         if st.button("📧 Enviar por email", type="primary", use_container_width=True):
             destino   = st.session_state.get("cfg_destino","")
             remetente = st.session_state.get("cfg_remetente","")
@@ -634,7 +630,6 @@ if st.session_state.get("processado"):
                     with st.spinner("📧 Enviando email..."):
                         enviar_email(selecionados, destino, remetente, senha, assunto_edit, corpo_edit)
                     st.success(f"✅ Email enviado para {destino} com {len(selecionados)} arquivo(s)!")
-                    cliente_sess = st.session_state.get("cliente")
                     if cliente_sess:
                         registrar_uso(cliente_sess, qtd_arquivos=len(selecionados), email_enviado=True)
                 except smtplib.SMTPAuthenticationError:
