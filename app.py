@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import base64
 import requests
 import img2pdf
@@ -8,6 +9,8 @@ import time
 import smtplib
 import tempfile
 import zipfile
+import io
+from datetime import datetime, timedelta, timezone, date
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
@@ -310,37 +313,59 @@ RETORNE APENAS JSON:
 # BLOCO 4 — GERAÇÃO DO EMAIL
 # ══════════════════════════════════════════════════════
 
+def fmt_brl(valor):
+    try:
+        v = float(str(valor).replace(",",".").replace("R$","").replace(" ","").strip())
+        s = f"{v:,.2f}".replace(",","X").replace(".",",").replace("X",".")
+        return f"R$ {s}"
+    except: return str(valor)
+
 def gerar_email(texto_bruto, dados, pdfs_selecionados):
+    """Monta texto diretamente — sem Gemini — campos obrigatórios sempre presentes."""
+    hora = datetime.now(timezone(timedelta(hours=-3))).hour
+    if 6 <= hora < 12:    saud = "Bom dia"
+    elif 12 <= hora < 18: saud = "Boa tarde"
+    else:                 saud = "Boa noite"
+
+    nome_dest    = dados.get("nome_destinatario","").strip()
+    saud_txt     = f"{saud}, {nome_dest}." if nome_dest else f"{saud}."
+    nome_cliente = dados.get("nome_completo","a cliente").split()[0] if dados.get("nome_completo") else "a cliente"
+
+    valor_imovel = dados.get("valor_imovel","")
+    if valor_imovel and not str(valor_imovel).startswith("R$"):
+        valor_imovel = fmt_brl(valor_imovel)
+    tipo_imovel = dados.get("tipo_imovel","")
+    ctx_imovel  = f" de imóvel {tipo_imovel} no valor de {valor_imovel}" if valor_imovel else ""
+
+    assunto = f"Documentação {nome_cliente}"
+    if tipo_imovel:  assunto += f" — Imóvel {tipo_imovel.capitalize()}"
+    if valor_imovel: assunto += f" {valor_imovel}"
+
     campos = []
-    if dados.get("email"):       campos.append(f"• 📧 E-mail: {dados['email']}")
-    if dados.get("telefone"):    campos.append(f"• 📱 Telefone: {dados['telefone']}")
-    if dados.get("nit_pis_nis"): campos.append(f"• 🪪 NIT/PIS/NIS: {dados['nit_pis_nis']}")
+    # NIT/PIS/NIS — sempre presente
+    campos.append(f"• 🪪 NIT/PIS/NIS: {dados.get('nit_pis_nis','')}")
+    # Renda
     if dados.get("renda_valor"):
-        tipo = dados.get("renda_tipo",""); prof = dados.get("renda_profissao","")
-        det  = f" ({tipo} – {prof})" if tipo or prof else ""
-        campos.append(f"• 💰 Renda mensal: {dados['renda_valor']}{det}")
+        renda = dados["renda_valor"]
+        if not str(renda).startswith("R$"): renda = fmt_brl(renda)
+        tipo  = dados.get("renda_tipo","")
+        det   = f" ({tipo})" if tipo else ""
+        campos.append(f"• 💰 Renda mensal: {renda}{det}")
+    # Carteira
     if str(dados.get("nunca_trabalhou_carteira","")).lower() in ("true","sim","yes","1"):
         campos.append("• Nunca trabalhou de carteira assinada")
-    if dados.get("dependentes"):  campos.append(f"• Possui {dados['dependentes']} dependente(s)")
-    if dados.get("cpf"):          campos.append(f"• CPF: {dados['cpf']}")
-    if dados.get("estado_civil"): campos.append(f"• Estado civil: {dados['estado_civil']}")
-    if dados.get("observacoes"):  campos.append(f"• Obs: {dados['observacoes']}")
+    # Dependentes
+    if dados.get("dependentes"):
+        campos.append(f"• Possui {dados['dependentes']} dependente(s)")
+    # Contato — SEMPRE presentes, em branco se não encontrado
+    campos.append(f"• 📧 E-mail: {dados.get('email','')}")
+    campos.append(f"• 📱 Telefone: {dados.get('telefone','')}")
 
-    campos_str   = "\n".join(campos) if campos else "[dados não identificados]"
-    nome_cliente = dados.get("nome_completo","a cliente").split()[0] if dados.get("nome_completo") else "a cliente"
-    nome_dest    = dados.get("nome_destinatario","")
-    saudacao     = f"Boa tarde, {nome_dest}." if nome_dest else "Boa tarde."
-    valor_imovel = dados.get("valor_imovel","")
-    tipo_imovel  = dados.get("tipo_imovel","")
-    ctx_imovel   = f" de imóvel {tipo_imovel} no valor de {valor_imovel}" if valor_imovel else ""
-    docs_lista   = "\n".join([f"- {n}" for n,_ in pdfs_selecionados])
+    campos_str = "\n".join(campos)
 
-    prompt = f"""
-Gere um email profissional CURTO e direto seguindo EXATAMENTE este modelo:
+    return f"""Assunto: {assunto}
 
-Assunto: [objetivo claro em até 10 palavras]
-
-{saudacao}
+{saud_txt}
 
 Conforme simulação realizada, segue documentação da cliente {nome_cliente} para aprovação de financiamento{ctx_imovel}.
 
@@ -351,25 +376,14 @@ Informações da cliente:
 Solicito, por gentileza, aprovação conforme simulação encaminhada.
 
 Fico no aguardo do retorno.
-Obrigada.
-
-REGRAS: Use o modelo acima. Não adicione parágrafos extras. Remova campos vazios. NÃO invente nada.
-DADOS: {json.dumps(dados, ensure_ascii=False)}
-TEXTO ORIGINAL: {texto_bruto}
-DOCUMENTOS ANEXADOS: {docs_lista}
-
-RETORNE APENAS O EMAIL.
-"""
-    try:
-        return chamar_gemini([{"text": prompt}]).strip()
-    except: return ""
+Obrigada."""
 
 
 # ══════════════════════════════════════════════════════
 # BLOCO 5 — CHECKLIST
 # ══════════════════════════════════════════════════════
 
-def calcular_checklist(nomes_pdfs):
+def calcular_checklist(nomes_pdfs, dados=None):
     docs = set(n.replace('.pdf','').lower() for n in nomes_pdfs)
     tem_h = any('holerite' in d for d in docs)
     tem_e = any('extrato'  in d for d in docs)
@@ -380,12 +394,18 @@ def calcular_checklist(nomes_pdfs):
         "RG ou CNH"                : ["rg","cnh"],
         "Certidão de Estado Civil" : ["certidao_nascimento","certidao_casamento"],
         "Comprovante de Residência": ["comprovante_residencia"],
-        "Carteira de Trabalho"     : ["carteira_de_trabalho"],
         "NIS / BIZ / NIT"          : ["nis_cadunico","biz","nit","pis","pasep"],
     }
-    if tipo=="FORMAL":     obrig["3 Últimos Holerites"]          = ["holerite"]
-    elif tipo=="INFORMAL": obrig["3 Últimos Extratos Bancários"] = ["extrato_bancario","extrato"]
-    else:                  obrig["Comprovante de Renda"]         = ["holerite","extrato"]
+    if tipo=="FORMAL":
+        obrig["Carteira de Trabalho"]         = ["carteira_de_trabalho"]
+        obrig["3 Últimos Holerites"]          = ["holerite"]
+    elif tipo=="INFORMAL":
+        nunca_clt = str((dados or {}).get("nunca_trabalhou_carteira","")).lower()
+        if nunca_clt not in ("true","sim","yes","1"):
+            obrig["Carteira de Trabalho (+3 anos FGTS)"] = ["carteira_de_trabalho"]
+        obrig["3 Últimos Extratos Bancários"] = ["extrato_bancario","extrato"]
+    else:
+        obrig["Comprovante de Renda"]         = ["holerite","extrato"]
     obrig["Simulação Habitacional"] = ["simulacao_habitacional"]
 
     ok=[]; faltando=[]
@@ -398,6 +418,12 @@ def calcular_checklist(nomes_pdfs):
             else:       faltando.append(f"❌ {nome}")
         else:
             (ok if enc else faltando).append(f"{'✅' if enc else '❌'} {nome}")
+    # Email e telefone
+    if dados:
+        if dados.get("email"): ok.append("✅ E-mail do participante")
+        else: faltando.append("❌ E-mail do participante — obrigatório")
+        if dados.get("telefone"): ok.append("✅ Telefone do participante")
+        else: faltando.append("❌ Telefone do participante — obrigatório")
     return {"tipo":tipo,"ok":ok,"faltando":faltando,"completo":len(faltando)==0}
 
 
@@ -455,10 +481,18 @@ st.subheader("📝 Passo 2 — Texto do WhatsApp (opcional)")
 texto_bruto = st.text_area(
     "Cole aqui mensagens, anotações, informações do cliente",
     height=120,
-    placeholder="Ex:\nGmail: cliente@gmail.com\nNIT 160.74503.57-6\n81 9 9296-7781\nRenda informal R$2.550 designer de unhas, 1 dependente, imóvel novo R$205.000..."
+    placeholder="Ex:\nGmail: cliente@gmail.com\nNIT 160.74503.57-6\n81 9 9296-7781\nRenda informal R$2.550, 1 dependente, imóvel novo R$205.000..."
 )
 
-# ── PASSO 3: Processar ──
+# ── PASSO 3: Destinatário ──
+st.subheader("👤 Passo 3 — Nome do destinatário (opcional)")
+st.text_input(
+    "Nome de quem vai receber o email",
+    placeholder="Ex: Ana, Carlos, Caixa Econômica...",
+    key="nome_destinatario_input"
+)
+
+# ── PROCESSAR ──
 st.divider()
 processar = st.button("🚀 PROCESSAR ARQUIVOS E TEXTO", type="primary", use_container_width=True)
 
@@ -474,37 +508,46 @@ if processar:
             tipo     = "pdf" if arq.name.lower().endswith('.pdf') else "imagem"
             arquivos_bytes.append((arq.name, conteudo, tipo))
 
-        with st.spinner("⏳ Processando documentos com IA... aguarde"):
-            pdfs_gerados = processar_documentos(arquivos_bytes)
+        barra = st.progress(0, text="📄 Lendo e organizando documentos...")
+        pdfs_gerados = processar_documentos(arquivos_bytes)
+        barra.progress(50, text="🔍 Extraindo dados do cliente...")
+        nome_dest_input = st.session_state.get("nome_destinatario_input","")
+        dados  = extrair_dados(texto_bruto, arquivos_bytes, pdfs_gerados)
+        dados["nome_destinatario"] = nome_dest_input
+        barra.progress(85, text="✍️ Gerando texto...")
+        gerado = gerar_email(texto_bruto, dados, pdfs_gerados)
+        barra.progress(100, text="✅ Concluído!")
+        time.sleep(0.4); barra.empty()
 
-        with st.spinner("🔍 Extraindo dados e gerando email..."):
-            dados  = extrair_dados(texto_bruto, arquivos_bytes, pdfs_gerados)
-            gerado = gerar_email(texto_bruto, dados, pdfs_gerados)
-
-        # Salva no session_state para persistir
         st.session_state["pdfs_gerados"] = pdfs_gerados
         st.session_state["email_gerado"] = gerado
+        st.session_state["dados"]        = dados
         st.session_state["processado"]   = True
+        cliente_sess = st.session_state.get("cliente")
+        if cliente_sess:
+            registrar_uso(cliente_sess, qtd_arquivos=len(arquivos_bytes))
 
 # ── Resultados (aparecem após processar) ──
 if st.session_state.get("processado"):
     pdfs_gerados = st.session_state["pdfs_gerados"]
     email_gerado = st.session_state["email_gerado"]
+    dados        = st.session_state.get("dados", {})
 
     st.divider()
 
     # ── Checklist ──
-    checklist = calcular_checklist([n for n,_ in pdfs_gerados])
+    checklist = calcular_checklist([n for n,_ in pdfs_gerados], dados)
     icone = "✅" if checklist['completo'] else "🚨"
     with st.expander(f"{icone} CHECKLIST — Renda: {checklist['tipo']}", expanded=True):
-        for i in checklist['ok']:      st.markdown(f"<span class='checklist-ok'>{i}</span>",    unsafe_allow_html=True)
+        for i in checklist['ok']:
+            st.markdown(f"<span class='checklist-ok'>{i}</span>", unsafe_allow_html=True)
         for i in checklist['faltando']:
             cor = "checklist-aviso" if "⚠️" in i else "checklist-falta"
             st.markdown(f"<span class='{cor}'>{i}</span>", unsafe_allow_html=True)
 
     st.divider()
 
-    # ── ETAPA 1: Documentos com checkbox ──
+    # ── ETAPA 1: Documentos gerados ──
     st.subheader("📄 Etapa 1 — Documentos gerados")
     st.caption("Desmarque o que estiver duplicado ou incorreto")
 
@@ -514,21 +557,26 @@ if st.session_state.get("processado"):
         with col1:
             marcado = st.checkbox(f"📎 {nome}", value=True, key=f"cb_{nome}")
         with col2:
-            st.download_button(
-                "⬇️ Baixar",
-                data=conteudo,
-                file_name=nome,
-                mime="application/pdf",
-                key=f"dl_{nome}"
-            )
+            st.download_button("⬇️ Baixar", data=conteudo, file_name=nome,
+                               mime="application/pdf", key=f"dl_{nome}")
         if marcado: selecionados.append((nome, conteudo))
+
+    # Botão ZIP ao final da lista
+    if selecionados:
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, "w") as zf:
+            for nome, conteudo in selecionados:
+                zf.writestr(nome, conteudo)
+        zip_buf.seek(0)
+        st.download_button("⬇️ Baixar toda documentação em ZIP", data=zip_buf,
+                           file_name="documentos_cliente.zip", mime="application/zip",
+                           use_container_width=True, key="zip_final")
 
     st.divider()
 
-    # ── ETAPA 2: Email ──
-    st.subheader("📝 Etapa 2 — Email gerado (editável)")
+    # ── ETAPA 2: Texto gerado ──
+    st.subheader("📝 Etapa 2 — Texto gerado (editável)")
 
-    # Extrai assunto
     assunto_inicial = "Documentação do Cliente"
     corpo_inicial   = email_gerado
     for linha in email_gerado.split('\n')[:5]:
@@ -540,17 +588,21 @@ if st.session_state.get("processado"):
     assunto_edit = st.text_input("Assunto", value=assunto_inicial)
     corpo_edit   = st.text_area("Corpo do email", value=corpo_inicial, height=280)
 
+    # Botão copiar
+    if st.button("📋 Copiar texto", use_container_width=True):
+        st.code(f"Assunto: {assunto_edit}\n\n{corpo_edit}", language=None)
+        st.caption("☝️ Selecione tudo (Ctrl+A) e copie (Ctrl+C)")
+
     st.divider()
 
     # ── ETAPA 3: Envio ──
     st.subheader("📬 Etapa 3 — Enviar por email")
-
     cliente_sess = st.session_state.get("cliente", {})
-    plano_atual  = cliente_sess.get("plano", "free")
-    is_pro       = plano_atual in ("mensal", "semestral", "anual")
+    plano_atual  = cliente_sess.get("plano","free")
+    is_pro       = plano_atual in ("mensal","semestral","anual")
 
     if not is_pro:
-        st.info("📧 **Envio por email disponível apenas no plano PRO (Mensal/Semestral/Anual).**\nBaixe os arquivos pelo botão ZIP acima e envie manualmente.")
+        st.info("📧 **Envio por email disponível apenas no plano PRO.**\nBaixe os arquivos pelo botão ZIP acima e envie manualmente.")
     else:
         st.caption("Configure o email destino e seu Gmail na barra lateral antes de enviar.")
         if st.button("📧 Enviar por email", type="primary", use_container_width=True):
