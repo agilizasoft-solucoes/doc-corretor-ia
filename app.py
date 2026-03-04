@@ -23,7 +23,7 @@ from pathlib import Path
 # ══════════════════════════════════════════════════════
 
 st.set_page_config(
-    page_title="DocCorretor IA",
+    page_title="ImobFlow",
     page_icon="📁",
     layout="centered"
 )
