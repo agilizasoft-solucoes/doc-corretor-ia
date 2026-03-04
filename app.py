@@ -691,9 +691,7 @@ def enviar_email(pdfs_selecionados, destino, remetente, senha, assunto, corpo):
 # BLOCO 7 — INTERFACE STREAMLIT
 # ══════════════════════════════════════════════════════
 
-# Logo + título principal
-exibir_logo(altura=75)
-st.markdown("<h2 style='text-align:center;margin-top:0'>📁 ImobFlow</h2>", unsafe_allow_html=True)
+exibir_logo(altura=120)
 st.caption("<div style='text-align:center'>Organize, identifique e envie documentos imobiliários com IA</div>", unsafe_allow_html=True)
 
 # ── Banner contador de dias (só para FREE) ──
@@ -725,7 +723,6 @@ with st.sidebar:
     venc_sb     = cliente_sb.get("data_vencimento","")
     is_pro_sb   = plano_sb in ("mensal","semestral","anual")
 
-    exibir_logo(altura=55, centralizar=True)
     st.markdown(f"### 👤 {nome_sb}")
     if is_pro_sb:
         st.caption(f"⭐ Plano PRO — {plano_sb.capitalize()}")
