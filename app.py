@@ -326,7 +326,12 @@ def gerar_email(texto_bruto, dados, pdfs_selecionados):
     if dados.get("renda_valor"):
         tipo = dados.get("renda_tipo",""); prof = dados.get("renda_profissao","")
         det  = f" ({tipo} – {prof})" if tipo or prof else ""
-        campos.append(f"• 💰 Renda mensal: {dados['renda_valor']}{det}")
+        # Garantir formatação R$
+        renda = dados['renda_valor']
+        if renda and not str(renda).startswith("R$"):
+            try: renda = f"R$ {float(str(renda).replace(',','.').replace('R$','').strip()):,.2f}".replace(",","X").replace(".",",").replace("X",".")
+            except: renda = f"R$ {renda}"
+        campos.append(f"• 💰 Renda mensal: {renda}{det}")
     if str(dados.get("nunca_trabalhou_carteira","")).lower() in ("true","sim","yes","1"):
         campos.append("• Nunca trabalhou de carteira assinada")
     if dados.get("dependentes"):  campos.append(f"• Possui {dados['dependentes']} dependente(s)")
@@ -334,9 +339,14 @@ def gerar_email(texto_bruto, dados, pdfs_selecionados):
 
     campos_str   = "\n".join(campos) if campos else "[dados não identificados]"
     nome_cliente = dados.get("nome_completo","a cliente").split()[0] if dados.get("nome_completo") else "a cliente"
-    nome_dest    = dados.get("nome_destinatario","")
+    # Destinatário: usar SOMENTE o nome_destinatario do campo de texto, nunca nomes dos documentos
+    nome_dest    = dados.get("nome_destinatario","").strip()
     saudacao     = f"Boa tarde, {nome_dest}." if nome_dest else "Boa tarde."
     valor_imovel = dados.get("valor_imovel","")
+    # Garantir formatação R$ no valor do imóvel
+    if valor_imovel and not str(valor_imovel).startswith("R$"):
+        try: valor_imovel = f"R$ {float(str(valor_imovel).replace(',','.').replace('R$','').strip()):,.2f}".replace(",","X").replace(".",",").replace("X",".")
+        except: valor_imovel = f"R$ {valor_imovel}"
     tipo_imovel  = dados.get("tipo_imovel","")
     ctx_imovel   = f" de imóvel {tipo_imovel} no valor de {valor_imovel}" if valor_imovel else ""
     docs_lista   = "\n".join([f"- {n}" for n,_ in pdfs_selecionados])
@@ -375,7 +385,7 @@ RETORNE APENAS O EMAIL.
 # BLOCO 5 — CHECKLIST
 # ══════════════════════════════════════════════════════
 
-def calcular_checklist(nomes_pdfs):
+def calcular_checklist(nomes_pdfs, dados=None):
     docs = set(n.replace('.pdf','').lower() for n in nomes_pdfs)
     tem_h = any('holerite' in d for d in docs)
     tem_e = any('extrato'  in d for d in docs)
@@ -404,6 +414,14 @@ def calcular_checklist(nomes_pdfs):
             else:       faltando.append(f"❌ {nome}")
         else:
             (ok if enc else faltando).append(f"{'✅' if enc else '❌'} {nome}")
+
+    # Verifica email e telefone nos dados extraídos
+    if dados:
+        if dados.get("email"): ok.append(f"✅ E-mail do participante")
+        else: faltando.append("❌ E-mail do participante — obrigatório")
+        if dados.get("telefone"): ok.append(f"✅ Telefone do participante")
+        else: faltando.append("❌ Telefone do participante — obrigatório")
+
     return {"tipo":tipo,"ok":ok,"faltando":faltando,"completo":len(faltando)==0}
 
 
@@ -464,7 +482,15 @@ texto_bruto = st.text_area(
     placeholder="Ex:\nGmail: cliente@gmail.com\nNIT 160.74503.57-6\n81 9 9296-7781\nRenda informal R$2.550 designer de unhas, 1 dependente, imóvel novo R$205.000..."
 )
 
-# ── PASSO 3: Processar ──
+# ── PASSO 3: Destinatário ──
+st.subheader("👤 Passo 3 — Nome do destinatário (opcional)")
+nome_dest_input = st.text_input(
+    "Nome de quem vai receber o email",
+    placeholder="Ex: Ana, Carlos, Caixa Econômica...",
+    key="nome_destinatario_input"
+)
+
+# ── PROCESSAR ──
 st.divider()
 processar = st.button("🚀 PROCESSAR ARQUIVOS E TEXTO", type="primary", use_container_width=True)
 
@@ -480,27 +506,32 @@ if processar:
             tipo     = "pdf" if arq.name.lower().endswith('.pdf') else "imagem"
             arquivos_bytes.append((arq.name, conteudo, tipo))
 
-        with st.spinner("⏳ Processando documentos com IA... aguarde"):
-            pdfs_gerados = processar_documentos(arquivos_bytes)
-
-        with st.spinner("🔍 Extraindo dados e gerando email..."):
-            dados  = extrair_dados(texto_bruto, arquivos_bytes, pdfs_gerados)
-            gerado = gerar_email(texto_bruto, dados, pdfs_gerados)
+        barra = st.progress(0, text="📄 Lendo e organizando documentos...")
+        pdfs_gerados = processar_documentos(arquivos_bytes)
+        barra.progress(50, text="🔍 Extraindo dados do cliente...")
+        dados  = extrair_dados(texto_bruto, arquivos_bytes, pdfs_gerados)
+        dados["nome_destinatario"] = st.session_state.get("nome_destinatario_input","")
+        barra.progress(80, text="✍️ Gerando texto profissional...")
+        gerado = gerar_email(texto_bruto, dados, pdfs_gerados)
+        barra.progress(100, text="✅ Concluído!")
+        time.sleep(0.5); barra.empty()
 
         # Salva no session_state para persistir
         st.session_state["pdfs_gerados"] = pdfs_gerados
         st.session_state["email_gerado"] = gerado
+        st.session_state["dados"]        = dados
         st.session_state["processado"]   = True
 
 # ── Resultados (aparecem após processar) ──
 if st.session_state.get("processado"):
     pdfs_gerados = st.session_state["pdfs_gerados"]
     email_gerado = st.session_state["email_gerado"]
+    dados        = st.session_state.get("dados", {})
 
     st.divider()
 
     # ── Checklist ──
-    checklist = calcular_checklist([n for n,_ in pdfs_gerados])
+    checklist = calcular_checklist([n for n,_ in pdfs_gerados], dados)
     icone = "✅" if checklist['completo'] else "🚨"
     with st.expander(f"{icone} CHECKLIST — Renda: {checklist['tipo']}", expanded=True):
         for i in checklist['ok']:      st.markdown(f"<span class='checklist-ok'>{i}</span>",    unsafe_allow_html=True)
