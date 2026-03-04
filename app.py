@@ -23,7 +23,7 @@ from pathlib import Path
 # ══════════════════════════════════════════════════════
 
 st.set_page_config(
-    page_title="ImobFlow",
+    page_title="DocCorretor IA",
     page_icon="📁",
     layout="centered"
 )
@@ -36,8 +36,34 @@ st.markdown("""
     .checklist-ok    { color: #2e7d32; font-weight: bold; }
     .checklist-falta { color: #c62828; font-weight: bold; }
     .checklist-aviso { color: #e65100; font-weight: bold; }
+    #MainMenu{visibility:hidden!important;display:none!important;}
+    header{visibility:hidden!important;display:none!important;}
+    footer{visibility:hidden!important;display:none!important;}
+    [data-testid="stToolbar"]{display:none!important;}
+    [data-testid="stDecoration"]{display:none!important;}
+    .stDeployButton{display:none!important;}
+    a[href*="streamlit.io"]{display:none!important;}
 </style>
 """, unsafe_allow_html=True)
+
+components.html("""
+<script>
+function hideMenu(){
+    const doc=window.parent.document;
+    ['header','#MainMenu','footer','[data-testid="stToolbar"]',
+     '[data-testid="stDecoration"]','.stDeployButton'].forEach(s=>{
+        doc.querySelectorAll(s).forEach(el=>{
+            el.style.setProperty('display','none','important');
+        });
+    });
+    doc.querySelectorAll('a[href*="streamlit"]').forEach(el=>{
+        el.style.setProperty('display','none','important');
+    });
+}
+hideMenu();
+new MutationObserver(hideMenu).observe(window.parent.document.body,{childList:true,subtree:true});
+</script>
+""", height=0)
 
 # ══════════════════════════════════════════════════════
 # CHAVES API — lidas dos Secrets do Streamlit
@@ -159,14 +185,9 @@ def chamar_gemini(lista_parts):
 # ══════════════════════════════════════════════════════
 
 def processar_documentos(arquivos_bytes):
-    """
-    arquivos_bytes: lista de (nome, bytes, tipo)
-    Retorna: lista de (nome_pdf, bytes_pdf)
-    """
     pdfs_finais = []
     tmp = tempfile.mkdtemp()
 
-    # Salva arquivos no temp
     caminhos = {}
     for nome, conteudo, _ in arquivos_bytes:
         caminho = os.path.join(tmp, nome)
@@ -176,7 +197,6 @@ def processar_documentos(arquivos_bytes):
     imgs  = [(n,c) for n,c,t in arquivos_bytes if t=="imagem"]
     pdfs  = [(n,c) for n,c,t in arquivos_bytes if t=="pdf"]
 
-    # ── PDFs ──
     if pdfs:
         prompt = f"""
 Especialista em documentos imobiliários brasileiros.
@@ -223,7 +243,6 @@ RETORNE JSON: {{"grupos":[{{"pdf_final":"Nome","arquivos":["arq.pdf"],"observaca
         except Exception as e:
             st.warning(f"Erro ao agrupar PDFs: {e}")
 
-    # ── Imagens ──
     if imgs:
         parts = []
         for nome, conteudo in imgs:
@@ -252,7 +271,6 @@ RETORNE JSON: {{"grupos":[{{"pdf":"Nome","arquivos":["arq.jpg"]}}]}}
                 nome_pdf   = f"{g['pdf']}.pdf"
                 arqs_grupo = [n for n in g['arquivos'] if n in nomes_img]
                 if not arqs_grupo: continue
-                # Salva imagens no temp e converte
                 caminhos_tmp = []
                 for n in arqs_grupo:
                     p = os.path.join(tmp, n)
@@ -270,29 +288,44 @@ RETORNE JSON: {{"grupos":[{{"pdf":"Nome","arquivos":["arq.jpg"]}}]}}
 # BLOCO 3 — EXTRAÇÃO DE DADOS
 # ══════════════════════════════════════════════════════
 
+# ⚠️ WHITELIST — apenas estes campos chegam ao texto.
+# observacoes, cpf, rg, endereco, estado_civil, banco
+# são BLOQUEADOS e NUNCA aparecem no email gerado.
+CAMPOS_PERMITIDOS = {
+    "nome_completo", "email", "telefone", "nit_pis_nis",
+    "renda_valor", "renda_tipo", "renda_profissao",
+    "dependentes", "valor_imovel", "tipo_imovel",
+    "nunca_trabalhou_carteira", "nome_destinatario"
+}
+
 def extrair_dados(texto_bruto, arquivos_bytes, pdfs_gerados):
     prompt = f"""
 Especialista em documentos imobiliários brasileiros.
 Extraia informações de DUAS FONTES:
-- Informação no TEXTO → usa do texto
-- Informação nos DOCUMENTOS → usa dos documentos
+- Texto → usa do texto
+- Documentos → usa dos documentos
 - Nas DUAS → usa o mais completo
 - Não encontrou → deixa ""
 
-TEXTO BRUTO:
+TEXTO:
 {texto_bruto}
 
-EXTRAIA: nome_completo, cpf, rg, data_nascimento, email, telefone, nit_pis_nis,
-endereco, estado_civil, renda_valor, renda_tipo, renda_profissao, dependentes,
-banco, valor_imovel, tipo_imovel, nome_destinatario, nunca_trabalhou_carteira, observacoes
+⚠️ EXTRAIA SOMENTE estes campos — NADA MAIS:
+nome_completo, email, telefone, nit_pis_nis,
+renda_valor, renda_tipo, renda_profissao,
+dependentes, valor_imovel, tipo_imovel,
+nunca_trabalhou_carteira
+
+🚫 NÃO extraia: observacoes, cpf, rg, data_nascimento,
+endereco, estado_civil, banco, histórico bancário,
+detalhes de simulação, informações de terceiros.
 
 RETORNE APENAS JSON:
 {{
-  "nome_completo":"","cpf":"","rg":"","data_nascimento":"",
-  "email":"","telefone":"","nit_pis_nis":"","endereco":"",
-  "estado_civil":"","renda_valor":"","renda_tipo":"","renda_profissao":"",
-  "dependentes":"","banco":"","valor_imovel":"","tipo_imovel":"",
-  "nome_destinatario":"","nunca_trabalhou_carteira":"","observacoes":""
+  "nome_completo":"","email":"","telefone":"","nit_pis_nis":"",
+  "renda_valor":"","renda_tipo":"","renda_profissao":"",
+  "dependentes":"","valor_imovel":"","tipo_imovel":"",
+  "nunca_trabalhou_carteira":""
 }}
 """
     parts = [{"text": prompt}]
@@ -304,9 +337,12 @@ RETORNE APENAS JSON:
         b64 = base64.b64encode(conteudo).decode('utf-8')
         parts += [{"text":f"DOCUMENTO: {nome}"},{"inline_data":{"mime_type":"application/pdf","data":b64}}]
     try:
-        resp  = chamar_gemini(parts)
-        return json.loads(resp.replace('```json','').replace('```','').strip())
-    except: return {}
+        resp        = chamar_gemini(parts)
+        dados_brutos = json.loads(resp.replace('```json','').replace('```','').strip())
+        # ⚠️ FILTRO DUPLO: remove qualquer campo fora da whitelist
+        return {k: dados_brutos.get(k, "") for k in CAMPOS_PERMITIDOS}
+    except:
+        return {k: "" for k in CAMPOS_PERMITIDOS}
 
 
 # ══════════════════════════════════════════════════════
@@ -355,10 +391,12 @@ def gerar_email(texto_bruto, dados, pdfs_selecionados):
     if str(dados.get("nunca_trabalhou_carteira","")).lower() in ("true","sim","yes","1"):
         campos.append("• Nunca trabalhou de carteira assinada")
     # Dependentes
-    if dados.get("dependentes"):
-        campos.append(f"• Possui {dados['dependentes']} dependente(s)")
-    # Contato — SEMPRE presentes, em branco se não encontrado
+    dep = dados.get("dependentes","")
+    if dep and str(dep) not in ("0",""):
+        campos.append(f"• Possui {dep} dependente(s)")
+    # Email — SEMPRE presente
     campos.append(f"• 📧 E-mail: {dados.get('email','')}")
+    # Telefone — SEMPRE presente
     campos.append(f"• 📱 Telefone: {dados.get('telefone','')}")
 
     campos_str = "\n".join(campos)
@@ -405,7 +443,7 @@ def calcular_checklist(nomes_pdfs, dados=None):
             obrig["Carteira de Trabalho (+3 anos FGTS)"] = ["carteira_de_trabalho"]
         obrig["3 Últimos Extratos Bancários"] = ["extrato_bancario","extrato"]
     else:
-        obrig["Comprovante de Renda"]         = ["holerite","extrato"]
+        obrig["Comprovante de Renda"] = ["holerite","extrato"]
     obrig["Simulação Habitacional"] = ["simulacao_habitacional"]
 
     ok=[]; faltando=[]
@@ -418,9 +456,8 @@ def calcular_checklist(nomes_pdfs, dados=None):
             else:       faltando.append(f"❌ {nome}")
         else:
             (ok if enc else faltando).append(f"{'✅' if enc else '❌'} {nome}")
-    # Email e telefone
     if dados:
-        if dados.get("email"): ok.append("✅ E-mail do participante")
+        if dados.get("email"):    ok.append("✅ E-mail do participante")
         else: faltando.append("❌ E-mail do participante — obrigatório")
         if dados.get("telefone"): ok.append("✅ Telefone do participante")
         else: faltando.append("❌ Telefone do participante — obrigatório")
@@ -453,9 +490,7 @@ st.title("📁 DocCorretor IA")
 st.caption("Organize, identifique e envie documentos imobiliários com IA")
 st.divider()
 
-# ── Configurações de email (sidebar — salvas na sessão) ──
 with st.sidebar:
-    # ── Info do cliente ──
     cliente_sb  = st.session_state.get("cliente", {})
     nome_sb     = cliente_sb.get("nome","")
     plano_sb    = cliente_sb.get("plano","free")
@@ -466,7 +501,6 @@ with st.sidebar:
     if is_pro_sb:
         st.caption(f"⭐ Plano PRO — {plano_sb.capitalize()}")
     else:
-        # Contador de dias para free
         try:
             dias_rest = (date.fromisoformat(venc_sb) - date.today()).days
             if dias_rest > 3:
@@ -476,7 +510,7 @@ with st.sidebar:
             else:
                 st.error("❌ **Acesso expirado!**\nFaça upgrade para continuar usando.")
         except:
-            st.caption(f"🆓 Plano Free")
+            st.caption("🆓 Plano Free")
 
     st.divider()
     st.header("⚙️ Configurações de Envio")
@@ -491,6 +525,13 @@ with st.sidebar:
         st.success("✅ Configuração salva!")
     st.divider()
     st.caption("💡 Senha de app ≠ senha do Gmail\nmyaccount.google.com → Segurança → Senhas de app")
+    st.divider()
+    if st.button("🚪 Sair", use_container_width=True):
+        for k in ["autenticado","cliente","cfg_destino","cfg_remetente","cfg_senha",
+                  "pdfs_gerados","email_gerado","processado","dados"]:
+            st.session_state.pop(k, None)
+        st.query_params.clear()
+        st.rerun()
 
 # ── PASSO 1: Upload ──
 st.subheader("📂 Passo 1 — Upload dos documentos")
@@ -524,8 +565,6 @@ if processar:
     if not arquivos_upload:
         st.error("⚠️ Faça o upload de pelo menos um arquivo antes de processar.")
     else:
-        # Prepara lista de arquivos
-        extensoes_img = ('.jpg','.jpeg','.png','.bmp','.webp','.tiff')
         arquivos_bytes = []
         for arq in arquivos_upload:
             conteudo = arq.read()
@@ -551,7 +590,7 @@ if processar:
         if cliente_sess:
             registrar_uso(cliente_sess, qtd_arquivos=len(arquivos_bytes))
 
-# ── Resultados (aparecem após processar) ──
+# ── Resultados ──
 if st.session_state.get("processado"):
     pdfs_gerados = st.session_state["pdfs_gerados"]
     email_gerado = st.session_state["email_gerado"]
@@ -559,7 +598,6 @@ if st.session_state.get("processado"):
 
     st.divider()
 
-    # ── Checklist ──
     checklist = calcular_checklist([n for n,_ in pdfs_gerados], dados)
     icone = "✅" if checklist['completo'] else "🚨"
     with st.expander(f"{icone} CHECKLIST — Renda: {checklist['tipo']}", expanded=True):
@@ -571,7 +609,6 @@ if st.session_state.get("processado"):
 
     st.divider()
 
-    # ── ETAPA 1: Documentos gerados ──
     st.subheader("📄 Etapa 1 — Documentos gerados")
     st.caption("Desmarque o que estiver duplicado ou incorreto")
 
@@ -585,7 +622,6 @@ if st.session_state.get("processado"):
                                mime="application/pdf", key=f"dl_{nome}")
         if marcado: selecionados.append((nome, conteudo))
 
-    # Botão ZIP ao final da lista
     if selecionados:
         zip_buf = io.BytesIO()
         with zipfile.ZipFile(zip_buf, "w") as zf:
@@ -598,7 +634,6 @@ if st.session_state.get("processado"):
 
     st.divider()
 
-    # ── ETAPA 2: Texto gerado ──
     st.subheader("📝 Etapa 2 — Texto gerado (editável)")
 
     assunto_inicial = "Documentação do Cliente"
@@ -612,65 +647,46 @@ if st.session_state.get("processado"):
     assunto_edit = st.text_input("Assunto", value=assunto_inicial)
     corpo_edit   = st.text_area("Corpo do email", value=corpo_inicial, height=280)
 
-    # Botão copiar
     if st.button("📋 Copiar texto", use_container_width=True):
         st.code(f"Assunto: {assunto_edit}\n\n{corpo_edit}", language=None)
         st.caption("☝️ Selecione tudo (Ctrl+A) e copie (Ctrl+C)")
 
     st.divider()
 
-    # ── ETAPA 3: Envio ──
     st.subheader("📬 Etapa 3 — Enviar por email")
     cliente_sess = st.session_state.get("cliente", {})
     plano_atual  = cliente_sess.get("plano","free")
     is_pro       = plano_atual in ("mensal","semestral","anual")
 
     if not is_pro:
-        # Links dos planos (substituir pelos links Kiwify quando disponível)
         LINK_MENSAL    = "https://kiwify.com.br/PLACEHOLDER_MENSAL"
         LINK_SEMESTRAL = "https://kiwify.com.br/PLACEHOLDER_SEMESTRAL"
         LINK_ANUAL     = "https://kiwify.com.br/PLACEHOLDER_ANUAL"
-        LINK_WHATSAPP  = "https://wa.me/5581992952521?text=Olá!%20Tenho%20interesse%20no%20DocCorretor%20IA%20e%20gostaria%20de%20saber%20mais."
+        LINK_WHATSAPP  = "https://wa.me/5581992952521?text=Ol%C3%A1!%20Tenho%20interesse%20no%20DocCorretor%20IA."
 
         st.markdown("---")
         st.markdown("### 🚀 Faça upgrade para enviar emails")
         st.caption("Escolha seu plano e continue usando sem limites:")
 
-        # Card Mensal
-        st.markdown("""
-        <a href="{}" target="_blank" style="
-            display:block; text-align:center; padding:10px;
-            background:#1976d2; color:white; border-radius:8px;
-            text-decoration:none; font-weight:bold; margin-bottom:8px;">
-            📅 Mensal — R$ 97,00
-        </a>""".format(LINK_MENSAL), unsafe_allow_html=True)
+        st.markdown(f"""<a href="{LINK_MENSAL}" target="_blank" style="display:block;text-align:center;
+            padding:12px;background:#1976d2;color:white;border-radius:8px;
+            text-decoration:none;font-weight:bold;margin-bottom:8px;">
+            📅 Mensal — R$ 97,00</a>""", unsafe_allow_html=True)
 
-        # Card Semestral
-        st.markdown("""
-        <a href="{}" target="_blank" style="
-            display:block; text-align:center; padding:10px;
-            background:#388e3c; color:white; border-radius:8px;
-            text-decoration:none; font-weight:bold; margin-bottom:8px;">
-            📆 Semestral — R$ 497,00
-        </a>""".format(LINK_SEMESTRAL), unsafe_allow_html=True)
+        st.markdown(f"""<a href="{LINK_SEMESTRAL}" target="_blank" style="display:block;text-align:center;
+            padding:12px;background:#388e3c;color:white;border-radius:8px;
+            text-decoration:none;font-weight:bold;margin-bottom:8px;">
+            📆 Semestral — R$ 497,00</a>""", unsafe_allow_html=True)
 
-        # Card Anual
-        st.markdown("""
-        <a href="{}" target="_blank" style="
-            display:block; text-align:center; padding:10px;
-            background:#f57c00; color:white; border-radius:8px;
-            text-decoration:none; font-weight:bold; margin-bottom:8px;">
-            🏆 Anual — R$ 897,00 <br><small>Melhor custo-benefício</small>
-        </a>""".format(LINK_ANUAL), unsafe_allow_html=True)
+        st.markdown(f"""<a href="{LINK_ANUAL}" target="_blank" style="display:block;text-align:center;
+            padding:12px;background:#f57c00;color:white;border-radius:8px;
+            text-decoration:none;font-weight:bold;margin-bottom:8px;">
+            🏆 Anual — R$ 897,00 &nbsp; ⭐ Mais escolhido</a>""", unsafe_allow_html=True)
 
-        # Botão WhatsApp
-        st.markdown("""
-        <a href="{}" target="_blank" style="
-            display:block; text-align:center; padding:10px;
-            background:#25d366; color:white; border-radius:8px;
-            text-decoration:none; font-weight:bold; margin-top:4px;">
-            💬 Falar com suporte no WhatsApp
-        </a>""".format(LINK_WHATSAPP), unsafe_allow_html=True)
+        st.markdown(f"""<a href="{LINK_WHATSAPP}" target="_blank" style="display:block;text-align:center;
+            padding:12px;background:#25d366;color:white;border-radius:8px;
+            text-decoration:none;font-weight:bold;">
+            💬 Falar com suporte no WhatsApp</a>""", unsafe_allow_html=True)
         st.markdown("---")
     else:
         st.caption("Configure o email destino e seu Gmail na barra lateral antes de enviar.")
