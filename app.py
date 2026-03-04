@@ -455,6 +455,30 @@ st.divider()
 
 # ── Configurações de email (sidebar — salvas na sessão) ──
 with st.sidebar:
+    # ── Info do cliente ──
+    cliente_sb  = st.session_state.get("cliente", {})
+    nome_sb     = cliente_sb.get("nome","")
+    plano_sb    = cliente_sb.get("plano","free")
+    venc_sb     = cliente_sb.get("data_vencimento","")
+    is_pro_sb   = plano_sb in ("mensal","semestral","anual")
+
+    st.markdown(f"### 👤 {nome_sb}")
+    if is_pro_sb:
+        st.caption(f"⭐ Plano PRO — {plano_sb.capitalize()}")
+    else:
+        # Contador de dias para free
+        try:
+            dias_rest = (date.fromisoformat(venc_sb) - date.today()).days
+            if dias_rest > 3:
+                st.warning(f"🆓 Teste gratuito\n⏳ **{dias_rest} dias restantes**")
+            elif dias_rest > 0:
+                st.error(f"🆓 Teste gratuito\n🚨 **Apenas {dias_rest} dia(s) restante(s)!**\nSeu acesso expira em breve.")
+            else:
+                st.error("❌ **Acesso expirado!**\nFaça upgrade para continuar usando.")
+        except:
+            st.caption(f"🆓 Plano Free")
+
+    st.divider()
     st.header("⚙️ Configurações de Envio")
     st.caption("Preencha uma vez — fica salvo enquanto o app estiver aberto.")
     cfg_destino   = st.text_input("📧 Email destino",  value=st.session_state.get("cfg_destino",""),  placeholder="destinatario@email.com")
@@ -602,7 +626,52 @@ if st.session_state.get("processado"):
     is_pro       = plano_atual in ("mensal","semestral","anual")
 
     if not is_pro:
-        st.info("📧 **Envio por email disponível apenas no plano PRO.**\nBaixe os arquivos pelo botão ZIP acima e envie manualmente.")
+        # Links dos planos (substituir pelos links Kiwify quando disponível)
+        LINK_MENSAL    = "https://kiwify.com.br/PLACEHOLDER_MENSAL"
+        LINK_SEMESTRAL = "https://kiwify.com.br/PLACEHOLDER_SEMESTRAL"
+        LINK_ANUAL     = "https://kiwify.com.br/PLACEHOLDER_ANUAL"
+        LINK_WHATSAPP  = "https://wa.me/5581992952521?text=Olá!%20Tenho%20interesse%20no%20DocCorretor%20IA%20e%20gostaria%20de%20saber%20mais."
+
+        st.markdown("---")
+        st.markdown("### 🚀 Faça upgrade para enviar emails")
+        st.caption("Escolha seu plano e continue usando sem limites:")
+
+        # Card Mensal
+        st.markdown("""
+        <a href="{}" target="_blank" style="
+            display:block; text-align:center; padding:10px;
+            background:#1976d2; color:white; border-radius:8px;
+            text-decoration:none; font-weight:bold; margin-bottom:8px;">
+            📅 Mensal — R$ 97,00
+        </a>""".format(LINK_MENSAL), unsafe_allow_html=True)
+
+        # Card Semestral
+        st.markdown("""
+        <a href="{}" target="_blank" style="
+            display:block; text-align:center; padding:10px;
+            background:#388e3c; color:white; border-radius:8px;
+            text-decoration:none; font-weight:bold; margin-bottom:8px;">
+            📆 Semestral — R$ 497,00
+        </a>""".format(LINK_SEMESTRAL), unsafe_allow_html=True)
+
+        # Card Anual
+        st.markdown("""
+        <a href="{}" target="_blank" style="
+            display:block; text-align:center; padding:10px;
+            background:#f57c00; color:white; border-radius:8px;
+            text-decoration:none; font-weight:bold; margin-bottom:8px;">
+            🏆 Anual — R$ 897,00 <br><small>Melhor custo-benefício</small>
+        </a>""".format(LINK_ANUAL), unsafe_allow_html=True)
+
+        # Botão WhatsApp
+        st.markdown("""
+        <a href="{}" target="_blank" style="
+            display:block; text-align:center; padding:10px;
+            background:#25d366; color:white; border-radius:8px;
+            text-decoration:none; font-weight:bold; margin-top:4px;">
+            💬 Falar com suporte no WhatsApp
+        </a>""".format(LINK_WHATSAPP), unsafe_allow_html=True)
+        st.markdown("---")
     else:
         st.caption("Configure o email destino e seu Gmail na barra lateral antes de enviar.")
         if st.button("📧 Enviar por email", type="primary", use_container_width=True):
