@@ -1686,6 +1686,63 @@ if not _is_pro_top and _venc_top:
 st.divider()
 
 # ── SIDEBAR PREMIUM ──
+# ── Botão flutuante para reabrir sidebar ──
+st.markdown("""
+<style>
+/* Botão de reabrir sidebar */
+.btn-abrir-sidebar {
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 99999;
+    background: #1565C0;
+    color: white !important;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 13px;
+    font-size: 18px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    line-height: 1;
+    text-decoration: none;
+    display: none;
+}
+/* Mostra o botão só quando a sidebar está recolhida */
+[data-testid="collapsedControl"] ~ * .btn-abrir-sidebar,
+body[data-sidebar-state="collapsed"] .btn-abrir-sidebar {
+    display: block;
+}
+</style>
+<script>
+function abrirSidebar() {
+    // Clica no botão nativo de expandir a sidebar do Streamlit
+    var btn = window.parent.document.querySelector('[data-testid="collapsedControl"]');
+    if (btn) { btn.click(); }
+}
+// Observa se a sidebar foi recolhida e exibe o botão
+(function() {
+    function checkSidebar() {
+        var collapsed = window.parent.document.querySelector('[data-testid="collapsedControl"]');
+        var fab = window.parent.document.getElementById('fab-sidebar');
+        if (!fab) {
+            fab = window.parent.document.createElement('button');
+            fab.id = 'fab-sidebar';
+            fab.innerHTML = '&#9776;';
+            fab.title = 'Abrir painel';
+            fab.style.cssText = 'position:fixed;top:14px;left:14px;z-index:99999;background:#1565C0;color:white;border:none;border-radius:8px;padding:7px 14px;font-size:20px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:none;';
+            fab.onclick = function() {
+                var b = window.parent.document.querySelector('[data-testid="collapsedControl"]');
+                if (b) b.click();
+            };
+            window.parent.document.body.appendChild(fab);
+        }
+        fab.style.display = collapsed ? 'block' : 'none';
+    }
+    setInterval(checkSidebar, 500);
+})();
+</script>
+""", unsafe_allow_html=True)
+
 with st.sidebar:
     cliente_sb  = st.session_state.get("cliente", {})
     nome_sb     = cliente_sb.get("nome","")
