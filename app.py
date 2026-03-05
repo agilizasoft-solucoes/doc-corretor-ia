@@ -367,7 +367,7 @@ def buscar_modelo(key):
 
 def chamar_gemini(lista_parts):
     key_index = 0
-    for tentativa in range(len(API_KEYS)*3):
+    for tentativa in range(len(API_KEYS)*4):
         if key_index >= len(API_KEYS):
             raise Exception("❌ Todas as chaves esgotadas.")
         key    = API_KEYS[key_index]
@@ -386,7 +386,12 @@ def chamar_gemini(lista_parts):
         if 'error' in rjson:
             codigo = rjson['error'].get('code',0)
             msg    = rjson['error'].get('message','')
-            if codigo == 429:
+            if codigo == 503:
+                # Serviço sobrecarregado — aguarda e tenta outra chave
+                espera = 10 + (tentativa * 5)
+                time.sleep(min(espera, 40))
+                key_index += 1
+            elif codigo == 429:
                 if e_limite_esgotado(msg): key_index += 1
                 else: time.sleep(35)
             else: raise ValueError(f"Erro [{codigo}]: {msg}")
@@ -1185,30 +1190,27 @@ def extrair_dados_polo(arquivos_bytes, polo, texto_bruto=""):
     cfg = campos_por_polo.get(polo, campos_por_polo["locatario"])
 
     prompt = f"""Especialista em documentação imobiliária brasileira.
-Você está analisando documentos EXCLUSIVAMENTE do {cfg['foco']}.
-NÃO confunda com dados de outras partes do contrato.
-Se não encontrar um campo → deixe "".
+Você está analisando documentos do {cfg['foco']}.
+Podem existir documentos de mais de uma pessoa (ex: titular e cônjuge).
 
-⚠️ REGRA CRÍTICA SOBRE CPF:
-O CPF pode aparecer em QUALQUER documento de identificação:
-- No próprio cartão/documento de CPF
-- Na CNH (Carteira Nacional de Habilitação) — campo "CPF" visível na frente
-- No RG (verso ou frente dependendo do estado)
-- No passaporte
-- Em holerites, extratos e outros documentos
-SEMPRE extraia o número de CPF independente de qual documento ele apareça.
-Formato esperado: XXX.XXX.XXX-XX
+REGRAS DE PRIORIDADE:
+1. Se houver documentos de MÚLTIPLAS pessoas, extraia os dados da PRIMEIRA pessoa identificada como titular principal
+2. O titular principal é geralmente quem aparece primeiro, ou quem tem mais documentos
+3. "nome_completo" = nome do titular principal
+4. "cpf" = CPF do titular principal (não do cônjuge)
+5. Se não houver forma de distinguir, extraia o CPF do primeiro documento analisado
+6. "cpf_conjuge" não existe no JSON — ignore cônjuge nos campos principais
 
-⚠️ REGRA SOBRE NOME COMPLETO:
-Extraia o nome completo exatamente como aparece no documento principal.
+REGRA SOBRE CPF:
+- CNH SEMPRE contém CPF — campo visível na frente do documento
+- RG moderno contém CPF no verso
+- Extraia independente do documento onde apareça
+- Formato: XXX.XXX.XXX-XX
 
-TEXTO ADICIONAL FORNECIDO:
+TEXTO ADICIONAL:
 {texto_bruto}
 
-⚠️ EXTRAIA SOMENTE estes campos do {cfg['foco']}:
-{', '.join(cfg['campos'])}
-
-RETORNE APENAS JSON válido (sem markdown, sem explicações):
+RETORNE APENAS JSON válido (sem markdown, sem texto extra):
 {cfg['campos_json']}
 """
     parts = [{"text": prompt}]
@@ -2167,64 +2169,65 @@ elif tipo_atendimento == "locacao":
         if bytes_fiador and not dados_fiador_ext.get("cpf"):
             avisos_dados.append("⚠️ CPF do **FIADOR** não identificado automaticamente — verifique ou adicione no campo de texto")
 
-        if avisos_dados:
-            for a in avisos_dados:
-                st.warning(a)
-            # Salvar previews para mini checklist
-            st.session_state["preview_locador"]   = dados_locador_ext
-            st.session_state["preview_locatario"] = dados_locatario_ext
-            st.session_state["preview_fiador"]    = dados_fiador_ext
+        # Exibe avisos mas continua processamento sempre
+        for a in avisos_dados:
+            st.warning(a)
 
-            # Dados consolidados do locatário (polo principal do email)
-            dados_loc = dados_locatario_ext.copy()
-            dados_loc["nome_destinatario"] = st.session_state.get("nome_dest_locacao","")
+        # Salvar previews para mini checklist
+        st.session_state["preview_locador"]   = dados_locador_ext
+        st.session_state["preview_locatario"] = dados_locatario_ext
+        st.session_state["preview_fiador"]    = dados_fiador_ext
 
-            # Todos os PDFs combinados para download
-            pdfs_loc = pdfs_locador + pdfs_locatario + pdfs_fiador
+        # Dados consolidados do locatário (polo principal do email)
+        dados_loc = dados_locatario_ext.copy()
+        dados_loc["nome_destinatario"] = st.session_state.get("nome_dest_locacao","")
 
-            # Gerar cláusula contratual
-            barra.progress(75, text="⚖️ Gerando cláusula contratual...")
-            clausula_loc = ""
-            if finalidade_imovel == "Residencial":
-                clausula_loc = gerar_clausula_residencial(imovel_dados)
-            elif finalidade_imovel == "Comercial":
-                clausula_loc = gerar_clausula_comercial(imovel_dados)
+        # Todos os PDFs combinados para download
+        pdfs_loc = pdfs_locador + pdfs_locatario + pdfs_fiador
 
-            barra.progress(82, text="📷 Analisando fotos do imóvel...")
-            termo_vistoria_bytes = None
-            fotos_nomes = []
-            if fotos_upload:
-                fotos_bytes_raw = []
-                for foto in fotos_upload:
-                    conteudo_foto = foto.read()
-                    fotos_bytes_raw.append((foto.name, conteudo_foto))
-                    fotos_nomes.append(foto.name)
-                descricao_ia = analisar_fotos_vistoria(fotos_bytes_raw)
-                imovel_dados["vistoria_gerada"] = True
-                termo_vistoria_bytes = gerar_termo_vistoria_pdf(imovel_dados, descricao_ia, fotos_nomes)
-            else:
-                imovel_dados["vistoria_gerada"] = False
+        # Gerar cláusula contratual
+        barra.progress(75, text="⚖️ Gerando cláusula contratual...")
+        clausula_loc = ""
+        if finalidade_imovel == "Residencial":
+            clausula_loc = gerar_clausula_residencial(imovel_dados)
+        elif finalidade_imovel == "Comercial":
+            clausula_loc = gerar_clausula_comercial(imovel_dados)
 
-            barra.progress(92, text="✍️ Gerando email profissional...")
-            email_loc = gerar_email_locacao(dados_loc, pdfs_loc, imovel=imovel_dados)
-            barra.progress(100, text="✅ Documentação pronta!")
-            time.sleep(0.4); barra.empty()
+        barra.progress(82, text="📷 Analisando fotos do imóvel...")
+        termo_vistoria_bytes = None
+        fotos_nomes = []
+        if fotos_upload:
+            fotos_bytes_raw = []
+            for foto in fotos_upload:
+                conteudo_foto = foto.read()
+                fotos_bytes_raw.append((foto.name, conteudo_foto))
+                fotos_nomes.append(foto.name)
+            descricao_ia = analisar_fotos_vistoria(fotos_bytes_raw)
+            imovel_dados["vistoria_gerada"] = True
+            termo_vistoria_bytes = gerar_termo_vistoria_pdf(imovel_dados, descricao_ia, fotos_nomes)
+        else:
+            imovel_dados["vistoria_gerada"] = False
 
-            st.session_state["pdfs_gerados_loc"]    = pdfs_loc
-            st.session_state["email_gerado_loc"]    = email_loc
-            st.session_state["dados_loc"]           = dados_loc
-            st.session_state["dados_locador"]       = dados_locador_ext
-            st.session_state["dados_locatario"]     = dados_locatario_ext
-            st.session_state["dados_fiador"]        = dados_fiador_ext
-            st.session_state["imovel_loc"]          = imovel_dados
-            st.session_state["clausula_loc"]        = clausula_loc
-            st.session_state["termo_vistoria_loc"]  = termo_vistoria_bytes
-            st.session_state["fotos_nomes_loc"]     = fotos_nomes
-            st.session_state["processado_loc"]      = True
-            cliente_sess = st.session_state.get("cliente")
-            if cliente_sess:
-                total_arqs = len(bytes_locador) + len(bytes_locatario) + len(bytes_fiador)
-                registrar_uso(cliente_sess, qtd_arquivos=total_arqs)
+        barra.progress(92, text="✍️ Gerando email profissional...")
+        email_loc = gerar_email_locacao(dados_loc, pdfs_loc, imovel=imovel_dados)
+        barra.progress(100, text="✅ Documentação pronta!")
+        time.sleep(0.4); barra.empty()
+
+        st.session_state["pdfs_gerados_loc"]    = pdfs_loc
+        st.session_state["email_gerado_loc"]    = email_loc
+        st.session_state["dados_loc"]           = dados_loc
+        st.session_state["dados_locador"]       = dados_locador_ext
+        st.session_state["dados_locatario"]     = dados_locatario_ext
+        st.session_state["dados_fiador"]        = dados_fiador_ext
+        st.session_state["imovel_loc"]          = imovel_dados
+        st.session_state["clausula_loc"]        = clausula_loc
+        st.session_state["termo_vistoria_loc"]  = termo_vistoria_bytes
+        st.session_state["fotos_nomes_loc"]     = fotos_nomes
+        st.session_state["processado_loc"]      = True
+        cliente_sess = st.session_state.get("cliente")
+        if cliente_sess:
+            total_arqs = len(bytes_locador) + len(bytes_locatario) + len(bytes_fiador)
+            registrar_uso(cliente_sess, qtd_arquivos=total_arqs)
 
   if st.session_state.get("processado_loc"):
     pdfs_loc         = st.session_state["pdfs_gerados_loc"]
