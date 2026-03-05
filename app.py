@@ -2530,12 +2530,12 @@ elif tipo_atendimento == "locacao":
         if fotos_nomes_loc:
             st.caption(f"📷 Total de fotos anexadas: {len(fotos_nomes_loc)}")
 
-    # — Gerar Contrato —
+    # — Gerar Contrato com Revisão —
     st.divider()
     st.markdown("""
     <div class='card-section-neutral'>
         <p class='section-title'>📄 Contrato de Locação</p>
-        <p class='section-subtitle'>Gerado com os dados extraídos e condições financeiras informadas</p>
+        <p class='section-subtitle'>Revise e edite os dados antes de gerar o PDF</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -2544,17 +2544,136 @@ elif tipo_atendimento == "locacao":
     if not valor_cont or float(valor_cont) == 0:
         st.warning("⚠️ Informe o valor do aluguel no Bloco 08 antes de gerar o contrato.")
     else:
-        if st.button("📄  GERAR CONTRATO DE LOCAÇÃO", type="primary", use_container_width=True, key="btn_gerar_contrato"):
-            with st.spinner("⚙️ Gerando contrato..."):
-                dados_loc_r   = st.session_state.get("dados_locador", {})
-                dados_locat_r = st.session_state.get("dados_locatario", {})
-                dados_fiad_r  = st.session_state.get("dados_fiador", {})
-                clausula_r    = st.session_state.get("clausula_loc", "")
-                contrato_bytes = gerar_contrato_pdf(
-                    dados_loc_r, dados_locat_r, dados_fiad_r,
-                    imovel_loc_atual, clausula_r
-                )
-                st.session_state["contrato_gerado"] = contrato_bytes
+        # Botão para abrir o formulário de revisão
+        if st.button("📝  REVISAR E EDITAR DADOS DO CONTRATO", type="primary", use_container_width=True, key="btn_revisar_contrato"):
+            st.session_state["revisao_aberta"] = True
+            st.session_state["contrato_gerado"] = None  # limpa PDF anterior
+
+        if st.session_state.get("revisao_aberta"):
+            st.markdown("<div style='background:#EEF4FF;border:1px solid #BBCFEE;border-radius:10px;padding:18px 22px;margin:12px 0;'>", unsafe_allow_html=True)
+            st.markdown("#### ✏️ Revise os dados — edite o que precisar antes de gerar o PDF")
+
+            d_loc   = st.session_state.get("dados_locador",   {})
+            d_locat = st.session_state.get("dados_locatario", {})
+            d_fiad  = st.session_state.get("dados_fiador",    {})
+            d_imovel = st.session_state.get("imovel_loc",     {})
+
+            st.markdown("---")
+            st.markdown("**🏠 LOCADOR (Proprietário)**")
+            col1, col2 = st.columns(2)
+            with col1:
+                r_loc_nome   = st.text_input("Nome completo",    value=d_loc.get("nome_completo",""), key="r_loc_nome")
+                r_loc_cpf    = st.text_input("CPF",              value=d_loc.get("cpf",""),           key="r_loc_cpf")
+                r_loc_rg     = st.text_input("RG",               value=d_loc.get("rg",""),            key="r_loc_rg")
+                r_loc_orgao  = st.text_input("Órgão expedidor",  value=d_loc.get("orgao_expedidor",""),key="r_loc_orgao")
+            with col2:
+                r_loc_eciv   = st.text_input("Estado civil",     value=d_loc.get("estado_civil",""),  key="r_loc_eciv")
+                r_loc_prof   = st.text_input("Profissão",        value=d_loc.get("profissao",""),     key="r_loc_prof")
+                r_loc_tel    = st.text_input("Telefone",         value=d_loc.get("telefone",""),      key="r_loc_tel")
+                r_loc_email  = st.text_input("E-mail",           value=d_loc.get("email",""),         key="r_loc_email")
+            r_loc_end = st.text_input("Endereço completo", value=d_loc.get("endereco",""), key="r_loc_end")
+
+            st.markdown("---")
+            st.markdown("**🔑 LOCATÁRIO (Inquilino)**")
+            col1, col2 = st.columns(2)
+            with col1:
+                r_locat_nome  = st.text_input("Nome completo",   value=d_locat.get("nome_completo",""), key="r_locat_nome")
+                r_locat_cpf   = st.text_input("CPF",             value=d_locat.get("cpf",""),           key="r_locat_cpf")
+                r_locat_rg    = st.text_input("RG",              value=d_locat.get("rg",""),            key="r_locat_rg")
+                r_locat_orgao = st.text_input("Órgão expedidor", value=d_locat.get("orgao_expedidor",""),key="r_locat_orgao")
+            with col2:
+                r_locat_eciv  = st.text_input("Estado civil",    value=d_locat.get("estado_civil",""),  key="r_locat_eciv")
+                r_locat_prof  = st.text_input("Profissão",       value=d_locat.get("profissao",""),     key="r_locat_prof")
+                r_locat_tel   = st.text_input("Telefone",        value=d_locat.get("telefone",""),      key="r_locat_tel")
+                r_locat_email = st.text_input("E-mail",          value=d_locat.get("email",""),         key="r_locat_email")
+            r_locat_end = st.text_input("Endereço completo", value=d_locat.get("endereco",""), key="r_locat_end")
+
+            if d_fiad and d_fiad.get("nome_completo"):
+                st.markdown("---")
+                st.markdown("**🤝 FIADOR**")
+                col1, col2 = st.columns(2)
+                with col1:
+                    r_fiad_nome  = st.text_input("Nome completo",   value=d_fiad.get("nome_completo",""), key="r_fiad_nome")
+                    r_fiad_cpf   = st.text_input("CPF",             value=d_fiad.get("cpf",""),           key="r_fiad_cpf")
+                    r_fiad_rg    = st.text_input("RG",              value=d_fiad.get("rg",""),            key="r_fiad_rg")
+                    r_fiad_orgao = st.text_input("Órgão expedidor", value=d_fiad.get("orgao_expedidor",""),key="r_fiad_orgao")
+                with col2:
+                    r_fiad_eciv  = st.text_input("Estado civil",    value=d_fiad.get("estado_civil",""),  key="r_fiad_eciv")
+                    r_fiad_prof  = st.text_input("Profissão",       value=d_fiad.get("profissao",""),     key="r_fiad_prof")
+                    r_fiad_tel   = st.text_input("Telefone",        value=d_fiad.get("telefone",""),      key="r_fiad_tel")
+                r_fiad_end = st.text_input("Endereço completo", value=d_fiad.get("endereco",""), key="r_fiad_end")
+            else:
+                r_fiad_nome=r_fiad_cpf=r_fiad_rg=r_fiad_orgao=r_fiad_eciv=r_fiad_prof=r_fiad_tel=r_fiad_end=""
+
+            st.markdown("---")
+            st.markdown("**🏡 IMÓVEL E CONDIÇÕES FINANCEIRAS**")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                r_tipo_imovel = st.text_input("Tipo do imóvel",  value=d_imovel.get("tipo_imovel","Casa"),  key="r_tipo_imovel")
+                r_area        = st.text_input("Área (m²)",       value=str(d_imovel.get("area","")),        key="r_area")
+                r_matricula   = st.text_input("Matrícula",       value=d_imovel.get("matricula",""),        key="r_matricula")
+            with col2:
+                r_valor       = st.text_input("Valor do aluguel (R$)", value=str(d_imovel.get("valor_aluguel","")), key="r_valor")
+                r_dia_venc    = st.text_input("Dia de vencimento",     value=str(d_imovel.get("dia_vencimento",5)), key="r_dia_venc")
+                r_forma_pag   = st.text_input("Forma de pagamento",    value=d_imovel.get("forma_pagamento",""),    key="r_forma_pag")
+            with col3:
+                r_duracao     = st.text_input("Duração do contrato",   value=d_imovel.get("duracao_contrato","12 meses"), key="r_duracao")
+                r_data_inicio = st.text_input("Data de início",        value=str(d_imovel.get("data_inicio","")),         key="r_data_inicio")
+                r_finalidade  = st.text_input("Finalidade",            value=d_imovel.get("finalidade","Residencial"),    key="r_finalidade")
+
+            st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+            if st.button("📄  GERAR CONTRATO COM DADOS REVISADOS", type="primary", use_container_width=True, key="btn_gerar_contrato"):
+                # Monta dicts atualizados com o que o usuário editou
+                dados_loc_rev = {
+                    "nome_completo": r_loc_nome,  "cpf": r_loc_cpf,
+                    "rg": r_loc_rg,               "orgao_expedidor": r_loc_orgao,
+                    "estado_civil": r_loc_eciv,   "profissao": r_loc_prof,
+                    "endereco": r_loc_end,         "telefone": r_loc_tel,
+                    "email": r_loc_email,
+                }
+                dados_locat_rev = {
+                    "nome_completo": r_locat_nome, "cpf": r_locat_cpf,
+                    "rg": r_locat_rg,              "orgao_expedidor": r_locat_orgao,
+                    "estado_civil": r_locat_eciv,  "profissao": r_locat_prof,
+                    "endereco": r_locat_end,        "telefone": r_locat_tel,
+                    "email": r_locat_email,
+                }
+                dados_fiad_rev = {
+                    "nome_completo": r_fiad_nome,  "cpf": r_fiad_cpf,
+                    "rg": r_fiad_rg,               "orgao_expedidor": r_fiad_orgao,
+                    "estado_civil": r_fiad_eciv,   "profissao": r_fiad_prof,
+                    "endereco": r_fiad_end,         "telefone": r_fiad_tel,
+                } if r_fiad_nome else {}
+                imovel_rev = dict(d_imovel)
+                imovel_rev.update({
+                    "tipo_imovel":       r_tipo_imovel,
+                    "area":              r_area,
+                    "matricula":         r_matricula,
+                    "valor_aluguel":     r_valor,
+                    "dia_vencimento":    r_dia_venc,
+                    "forma_pagamento":   r_forma_pag,
+                    "duracao_contrato":  r_duracao,
+                    "data_inicio":       r_data_inicio,
+                    "finalidade":        r_finalidade,
+                })
+                # Salva os dados revisados no session_state para uso posterior (email etc.)
+                st.session_state["dados_locador"]   = dados_loc_rev
+                st.session_state["dados_locatario"] = dados_locat_rev
+                st.session_state["dados_fiador"]    = dados_fiad_rev
+                st.session_state["imovel_loc"]      = imovel_rev
+
+                with st.spinner("⚙️ Gerando contrato..."):
+                    clausula_r = st.session_state.get("clausula_loc", "")
+                    contrato_bytes = gerar_contrato_pdf(
+                        dados_loc_rev, dados_locat_rev, dados_fiad_rev,
+                        imovel_rev, clausula_r
+                    )
+                    st.session_state["contrato_gerado"] = contrato_bytes
+                st.success("✅ Contrato gerado com os dados revisados!")
+                st.session_state["revisao_aberta"] = False
+                st.rerun()
 
     if st.session_state.get("contrato_gerado"):
         st.download_button(
@@ -2565,7 +2684,11 @@ elif tipo_atendimento == "locacao":
             use_container_width=True,
             key="dl_contrato"
         )
-        st.success("✅ Contrato gerado! Revise os dados antes de assinar.")
+        st.success("✅ Contrato pronto! Revise antes de assinar.")
+        if st.button("✏️ Editar dados novamente", use_container_width=True, key="btn_reeditar"):
+            st.session_state["revisao_aberta"] = True
+            st.session_state["contrato_gerado"] = None
+            st.rerun()
 
     st.divider()
     st.markdown("""
