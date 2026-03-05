@@ -2237,7 +2237,8 @@ elif tipo_atendimento == "locacao":
             dados_locador_direto=dados_locador_ext,
             dados_locatario_direto=dados_locatario_ext,
             dados_fiador_direto=dados_fiador_ext if bytes_fiador else {}
-        )        barra.progress(100, text="✅ Documentação pronta!")
+        )
+        barra.progress(100, text="✅ Documentação pronta!")
         time.sleep(0.4); barra.empty()
 
         st.session_state["pdfs_gerados_loc"]    = pdfs_loc
