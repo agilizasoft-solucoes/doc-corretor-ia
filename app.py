@@ -1305,7 +1305,8 @@ def _bloco_polo_email(titulo, dados):
     return "\n".join(linhas)
 
 
-def gerar_email_locacao(dados, pdfs_selecionados, imovel=None):
+def gerar_email_locacao(dados, pdfs_selecionados, imovel=None,
+                        dados_locador_direto=None, dados_locatario_direto=None, dados_fiador_direto=None):
     import streamlit as _st
     hora = datetime.now(timezone(timedelta(hours=-3))).hour
     if 6 <= hora < 12:    saud = "Bom dia"
@@ -1318,10 +1319,10 @@ def gerar_email_locacao(dados, pdfs_selecionados, imovel=None):
 
     assunto = f"Documentação para análise de locação — {nome_cliente}"
 
-    # Recupera dados de cada polo do session_state
-    dados_locatario = _st.session_state.get("dados_locatario", dados)
-    dados_fiador    = _st.session_state.get("dados_fiador", {})
-    dados_locador   = _st.session_state.get("dados_locador", {})
+    # Usa dados passados diretamente (prioridade) ou fallback para session_state
+    dados_locatario = dados_locatario_direto if dados_locatario_direto is not None else _st.session_state.get("dados_locatario", dados)
+    dados_fiador    = dados_fiador_direto    if dados_fiador_direto    is not None else _st.session_state.get("dados_fiador", {})
+    dados_locador   = dados_locador_direto   if dados_locador_direto   is not None else _st.session_state.get("dados_locador", {})
 
     # Garantia locatícia
     tipo_garantia = dados.get("tipo_garantia", "")
@@ -2231,8 +2232,12 @@ elif tipo_atendimento == "locacao":
             imovel_dados["vistoria_gerada"] = False
 
         barra.progress(92, text="✍️ Gerando email profissional...")
-        email_loc = gerar_email_locacao(dados_loc, pdfs_loc, imovel=imovel_dados)
-        barra.progress(100, text="✅ Documentação pronta!")
+        email_loc = gerar_email_locacao(
+            dados_loc, pdfs_loc, imovel=imovel_dados,
+            dados_locador_direto=dados_locador_ext,
+            dados_locatario_direto=dados_locatario_ext,
+            dados_fiador_direto=dados_fiador_ext if bytes_fiador else {}
+        )        barra.progress(100, text="✅ Documentação pronta!")
         time.sleep(0.4); barra.empty()
 
         st.session_state["pdfs_gerados_loc"]    = pdfs_loc
