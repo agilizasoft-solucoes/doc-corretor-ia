@@ -958,13 +958,26 @@ Você está analisando documentos EXCLUSIVAMENTE do {cfg['foco']}.
 NÃO confunda com dados de outras partes do contrato.
 Se não encontrar um campo → deixe "".
 
-TEXTO ADICIONAL:
+⚠️ REGRA CRÍTICA SOBRE CPF:
+O CPF pode aparecer em QUALQUER documento de identificação:
+- No próprio cartão/documento de CPF
+- Na CNH (Carteira Nacional de Habilitação) — campo "CPF" visível na frente
+- No RG (verso ou frente dependendo do estado)
+- No passaporte
+- Em holerites, extratos e outros documentos
+SEMPRE extraia o número de CPF independente de qual documento ele apareça.
+Formato esperado: XXX.XXX.XXX-XX
+
+⚠️ REGRA SOBRE NOME COMPLETO:
+Extraia o nome completo exatamente como aparece no documento principal.
+
+TEXTO ADICIONAL FORNECIDO:
 {texto_bruto}
 
 ⚠️ EXTRAIA SOMENTE estes campos do {cfg['foco']}:
 {', '.join(cfg['campos'])}
 
-RETORNE APENAS JSON (sem markdown):
+RETORNE APENAS JSON válido (sem markdown, sem explicações):
 {cfg['campos_json']}
 """
     parts = [{"text": prompt}]
@@ -975,8 +988,25 @@ RETORNE APENAS JSON (sem markdown):
                   {"inline_data": {"mime_type": mime, "data": b64}}]
     try:
         resp = chamar_gemini(parts)
-        dados_brutos = json.loads(resp.replace('```json','').replace('```','').strip())
-        return {k: dados_brutos.get(k, "") for k in cfg['campos']}
+        # Limpeza robusta do JSON
+        texto = resp.strip()
+        # Remove markdown
+        texto = texto.replace('```json','').replace('```','').strip()
+        # Extrai apenas o bloco JSON se houver texto ao redor
+        inicio = texto.find('{')
+        fim    = texto.rfind('}')
+        if inicio != -1 and fim != -1:
+            texto = texto[inicio:fim+1]
+        dados_brutos = json.loads(texto)
+        resultado = {k: dados_brutos.get(k, "") for k in cfg['campos']}
+        # Normaliza CPF — aceita com ou sem máscara
+        cpf_raw = resultado.get("cpf", "")
+        if cpf_raw:
+            import re
+            digitos = re.sub(r'\D','', str(cpf_raw))
+            if len(digitos) == 11:
+                resultado["cpf"] = f"{digitos[:3]}.{digitos[3:6]}.{digitos[6:9]}-{digitos[9:]}"
+        return resultado
     except:
         return {k: "" for k in cfg['campos']}
 
@@ -1830,23 +1860,20 @@ elif tipo_atendimento == "locacao":
         barra.progress(68, text="🔍 Extraindo dados do Fiador..." if bytes_fiador else "⚖️ Validando dados...")
         dados_fiador_ext    = extrair_dados_polo(bytes_fiador,    "fiador",    texto_loc_val) if bytes_fiador else {}
 
-        # Validações pós-extração
-        erros_dados = []
+        # Validações pós-extração — avisos, não bloqueios
+        avisos_dados = []
         if not dados_locador_ext.get("cpf"):
-            erros_dados.append("❌ CPF do **LOCADOR** não identificado — verifique os documentos enviados")
+            avisos_dados.append("⚠️ CPF do **LOCADOR** não identificado automaticamente — verifique ou adicione no campo de texto")
         if not dados_locatario_ext.get("cpf"):
-            erros_dados.append("❌ CPF do **LOCATÁRIO** não identificado — verifique os documentos enviados")
+            avisos_dados.append("⚠️ CPF do **LOCATÁRIO** não identificado automaticamente — verifique ou adicione no campo de texto")
         if not dados_locatario_ext.get("renda_valor"):
-            erros_dados.append("⚠️ Renda do **LOCATÁRIO** não identificada — adicione informação no campo de texto")
+            avisos_dados.append("⚠️ Renda do **LOCATÁRIO** não identificada — adicione no campo de texto (Ex: Renda R$3.200)")
         if bytes_fiador and not dados_fiador_ext.get("cpf"):
-            erros_dados.append("❌ CPF do **FIADOR** não identificado — verifique os documentos enviados")
+            avisos_dados.append("⚠️ CPF do **FIADOR** não identificado automaticamente — verifique ou adicione no campo de texto")
 
-        if erros_dados:
-            barra.empty()
-            for e in erros_dados:
-                st.error(e)
-            st.info("💡 Adicione as informações faltantes no campo de texto (Bloco 04) e tente novamente.")
-        else:
+        if avisos_dados:
+            for a in avisos_dados:
+                st.warning(a)
             # Salvar previews para mini checklist
             st.session_state["preview_locador"]   = dados_locador_ext
             st.session_state["preview_locatario"] = dados_locatario_ext
