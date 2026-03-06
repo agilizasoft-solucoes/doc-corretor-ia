@@ -2917,9 +2917,10 @@ elif tipo_atendimento == "locacao":
                     r_fiad_eciv  = st.text_input("Estado civil",    value=d_fiad.get("estado_civil",""),  key="r_fiad_eciv")
                     r_fiad_prof  = st.text_input("Profissão",       value=d_fiad.get("profissao",""),     key="r_fiad_prof")
                     r_fiad_tel   = st.text_input("Telefone",        value=d_fiad.get("telefone",""),      key="r_fiad_tel")
+                    r_fiad_email = st.text_input("E-mail",          value=d_fiad.get("email",""),         key="r_fiad_email")
                 r_fiad_end = st.text_input("Endereço completo", value=d_fiad.get("endereco",""), key="r_fiad_end")
             else:
-                r_fiad_nome=r_fiad_cpf=r_fiad_rg=r_fiad_orgao=r_fiad_eciv=r_fiad_prof=r_fiad_tel=r_fiad_end=""
+                r_fiad_nome=r_fiad_cpf=r_fiad_rg=r_fiad_orgao=r_fiad_eciv=r_fiad_prof=r_fiad_tel=r_fiad_email=r_fiad_end=""
 
             st.markdown("---")
             st.markdown("**🏡 IMÓVEL E CONDIÇÕES FINANCEIRAS**")
@@ -2961,6 +2962,7 @@ elif tipo_atendimento == "locacao":
                     "rg": r_fiad_rg,               "orgao_expedidor": r_fiad_orgao,
                     "estado_civil": r_fiad_eciv,   "profissao": r_fiad_prof,
                     "endereco": r_fiad_end,         "telefone": r_fiad_tel,
+                    "email": r_fiad_email,
                 } if r_fiad_nome else {}
                 imovel_rev = dict(d_imovel)
                 imovel_rev.update({
