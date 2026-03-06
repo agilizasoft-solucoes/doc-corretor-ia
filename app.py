@@ -2135,10 +2135,24 @@ if "tipo_atendimento" not in st.session_state:
 
     # ── Barra de conta (tela inicial) ──
     st.divider()
-    _bi_e, _bi_cfg, _bi_sup, _bi_out = st.columns([4, 1.2, 1.1, 0.9])
+    st.markdown("""
+    <style>
+    .rodape-conta button { font-size:0.72rem !important; padding:2px 10px !important;
+        min-height:0 !important; height:24px !important; line-height:1.2 !important;
+        border-radius:12px !important; border:1px solid #D5D5D5 !important;
+        background:transparent !important; color:#888 !important; box-shadow:none !important; }
+    .rodape-conta button:hover { background:#F0F0F0 !important; color:#333 !important; }
+    .rodape-conta [data-testid="stPopover"] button { font-size:0.72rem !important;
+        padding:2px 10px !important; min-height:0 !important; height:24px !important;
+        border-radius:12px !important; border:1px solid #D5D5D5 !important;
+        background:transparent !important; color:#888 !important; box-shadow:none !important; }
+    </style>
+    <div class="rodape-conta"></div>
+    """, unsafe_allow_html=True)
+    _bi_e, _bi_cfg, _bi_sup, _bi_out = st.columns([5, 0.8, 0.9, 0.7])
 
     with _bi_cfg:
-        with st.popover("⚙️ Email", use_container_width=True):
+        with st.popover("⚙️ email"):
             st.caption("**Configuração de envio de email**")
             _cfg_d = st.text_input("📧 Email destino",         value=st.session_state.get("cfg_destino",""),   placeholder="destinatario@email.com", key="cfg_d_home")
             _cfg_r = st.text_input("📤 Seu Gmail (remetente)", value=st.session_state.get("cfg_remetente",""), placeholder="seuemail@gmail.com",     key="cfg_r_home")
@@ -2151,9 +2165,9 @@ if "tipo_atendimento" not in st.session_state:
                 st.success("✅ Salvo!")
 
     with _bi_sup:
-        with st.popover("🔧 Suporte", use_container_width=True):
+        with st.popover("🔧 suporte"):
             st.caption("**Diagnóstico técnico**")
-            st.caption("Baixe o relatório e envie ao suporte.")
+            st.caption("Baixe e envie ao suporte.")
             import sys, platform
             from datetime import datetime as _dth
             _diag = [
@@ -2179,17 +2193,12 @@ if "tipo_atendimento" not in st.session_state:
             for _er in _errs: _diag.append(f"  ⚠ {_er}")
             if not _errs: _diag.append("(nenhum)")
             _diag.append("\n" + "=" * 60)
-            st.download_button(
-                "⬇️ Baixar relatório (.txt)",
-                data="\n".join(_diag).encode("utf-8"),
-                file_name=f"diag_imobflow_{_dth.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                mime="text/plain",
-                use_container_width=True,
-                key="dl_diag_home"
-            )
+            st.download_button("⬇️ Baixar .txt", data="\n".join(_diag).encode("utf-8"),
+                file_name=f"diag_{_dth.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                mime="text/plain", use_container_width=True, key="dl_diag_home")
 
     with _bi_out:
-        if st.button("🚪 Sair", use_container_width=True, key="sair_home"):
+        if st.button("🚪 sair", key="sair_home"):
             for _k in ["autenticado","cliente","cfg_destino","cfg_remetente","cfg_senha",
                        "pdfs_gerados","email_gerado","processado","dados",
                        "pdfs_gerados_loc","email_gerado_loc","processado_loc","dados_loc","tipo_atendimento"]:
@@ -3569,29 +3578,25 @@ elif tipo_atendimento == "locacao":
             if key in st.session_state: del st.session_state[key]
         st.rerun()
 
-# ── Barra discreta de conta ──
+# ── Barra discreta de conta (páginas de serviço) ──
 st.divider()
 st.markdown("""
 <style>
-.barra-conta .stButton > button {
-    font-size: 0.78rem !important;
-    padding: 4px 12px !important;
-    height: auto !important;
-    border-radius: 20px !important;
-    border: 1px solid #DDD !important;
-    background: #FAFAFA !important;
-    color: #555 !important;
-}
+.rodape-srv button { font-size:0.72rem !important; padding:2px 10px !important;
+    min-height:0 !important; height:24px !important; line-height:1.2 !important;
+    border-radius:12px !important; border:1px solid #D5D5D5 !important;
+    background:transparent !important; color:#888 !important; box-shadow:none !important; }
+.rodape-srv button:hover { background:#F0F0F0 !important; color:#333 !important; }
 </style>
+<div class="rodape-srv"></div>
 """, unsafe_allow_html=True)
 
 _em_servico = st.session_state.get("tipo_atendimento") in ("credito", "locacao")
 
 if _em_servico:
-    # Dentro das páginas de serviço: só botão Sair
-    _cs1, _cs2 = st.columns([6, 0.9])
+    _cs1, _cs2 = st.columns([8, 0.7])
     with _cs2:
-        if st.button("🚪 Sair", use_container_width=True, key="sair_rodape"):
+        if st.button("🚪 sair", key="sair_rodape"):
             for k in ["autenticado","cliente","cfg_destino","cfg_remetente","cfg_senha",
                       "pdfs_gerados","email_gerado","processado","dados",
                       "pdfs_gerados_loc","email_gerado_loc","processado_loc","dados_loc","tipo_atendimento"]:
@@ -3599,11 +3604,10 @@ if _em_servico:
             st.query_params.clear()
             st.rerun()
 else:
-    # Fora das páginas de serviço: os 3 botões
-    _ce, _ccfg, _csup, _clogout = st.columns([4, 1.2, 1.1, 0.9])
+    _ce, _ccfg, _csup, _clogout = st.columns([5, 0.8, 0.9, 0.7])
 
     with _ccfg:
-        with st.popover("⚙️ Email", use_container_width=True):
+        with st.popover("⚙️ email"):
             st.caption("**Configuração de envio de email**")
             cfg_destino_r   = st.text_input("📧 Email destino",         value=st.session_state.get("cfg_destino",""),   placeholder="destinatario@email.com", key="cfg_destino_rod")
             cfg_remetente_r = st.text_input("📤 Seu Gmail (remetente)", value=st.session_state.get("cfg_remetente",""), placeholder="seuemail@gmail.com",     key="cfg_remetente_rod")
@@ -3616,9 +3620,9 @@ else:
                 st.success("✅ Salvo!")
 
     with _csup:
-        with st.popover("🔧 Suporte", use_container_width=True):
+        with st.popover("🔧 suporte"):
             st.caption("**Diagnóstico técnico**")
-            st.caption("Baixe o relatório e envie ao suporte.")
+            st.caption("Baixe e envie ao suporte.")
             import sys, platform
             from datetime import datetime as _dt
             diag_linhas = []
@@ -3689,7 +3693,7 @@ else:
             )
 
     with _clogout:
-        if st.button("🚪 Sair", use_container_width=True, key="sair_rodape"):
+        if st.button("🚪 sair", key="sair_rodape"):
             for k in ["autenticado","cliente","cfg_destino","cfg_remetente","cfg_senha",
                       "pdfs_gerados","email_gerado","processado","dados",
                       "pdfs_gerados_loc","email_gerado_loc","processado_loc","dados_loc","tipo_atendimento"]:
