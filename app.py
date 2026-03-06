@@ -352,7 +352,7 @@ def e_limite_esgotado(m):
 
 def buscar_modelo(key):
     try:
-        r = requests.get(f"https://generativelanguage.googleapis.com/v1beta/models?key={key}").json()
+        r = requests.get(f"https://generativelanguage.googleapis.com/v1beta/models?key={key}", timeout=15).json()
         for m in r.get('models',[]):
             if "generateContent" in m['supportedGenerationMethods'] and "flash" in m['name']:
                 return m['name']
@@ -361,7 +361,8 @@ def buscar_modelo(key):
 
 def chamar_gemini(lista_parts):
     key_index = 0
-    for tentativa in range(len(API_KEYS)*4):
+    max_tentativas = min(len(API_KEYS) * 3, 9)
+    for tentativa in range(max_tentativas):
         if key_index >= len(API_KEYS):
             raise Exception("❌ Todas as chaves esgotadas.")
         key    = API_KEYS[key_index]
@@ -376,23 +377,32 @@ def chamar_gemini(lista_parts):
                 {"category":"HARM_CATEGORY_DANGEROUS_CONTENT","threshold":"BLOCK_NONE"},
             ]
         }
-        rjson = requests.post(url, json=payload).json()
+        try:
+            resp  = requests.post(url, json=payload, timeout=60)
+            rjson = resp.json()
+        except requests.exceptions.Timeout:
+            key_index += 1
+            continue
+        except Exception as e:
+            key_index += 1
+            continue
         if 'error' in rjson:
-            codigo = rjson['error'].get('code',0)
-            msg    = rjson['error'].get('message','')
+            codigo = rjson['error'].get('code', 0)
+            msg    = rjson['error'].get('message', '')
             if codigo == 503:
-                # Serviço sobrecarregado — aguarda e tenta outra chave
-                espera = 10 + (tentativa * 5)
-                time.sleep(min(espera, 40))
+                espera = 8 + (tentativa * 4)
+                time.sleep(min(espera, 30))
                 key_index += 1
             elif codigo == 429:
                 if e_limite_esgotado(msg): key_index += 1
-                else: time.sleep(35)
-            else: raise ValueError(f"Erro [{codigo}]: {msg}")
+                else: time.sleep(20)
+            else:
+                raise ValueError(f"Erro [{codigo}]: {msg}")
             continue
-        if 'candidates' not in rjson: raise ValueError(f"Resposta inesperada")
+        if 'candidates' not in rjson:
+            raise ValueError("Resposta inesperada da API.")
         return rjson['candidates'][0]['content']['parts'][0]['text']
-    raise ValueError("❌ Todas as tentativas falharam.")
+    raise ValueError("❌ Todas as tentativas falharam. Tente novamente em instantes.")
 
 
 # ══════════════════════════════════════════════════════
@@ -1857,14 +1867,34 @@ if tipo_atendimento == "credito":
             conteudo = arq.read()
             tipo     = "pdf" if arq.name.lower().endswith('.pdf') else "imagem"
             arquivos_bytes.append((arq.name, conteudo, tipo))
-        barra = st.progress(0, text="📄 Lendo e organizando documentos...")
-        pdfs_gerados = processar_documentos(arquivos_bytes)
-        barra.progress(50, text="🔍 Extraindo dados do cliente...")
+        barra = st.progress(0, text="⚡ Processando documentos em paralelo...")
+        from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
+
+        texto_cred = st.session_state.get("texto_bruto_credito","")
         nome_dest_input = st.session_state.get("nome_destinatario_input","")
-        dados  = extrair_dados(st.session_state.get("texto_bruto_credito",""), arquivos_bytes, pdfs_gerados)
+
+        _res = {}
+        def _tarefa_cred(nome, fn, *args):
+            try: return nome, fn(*args), None
+            except Exception as e: return nome, None, str(e)
+
+        with ThreadPoolExecutor(max_workers=2) as _ex:
+            _futures = {
+                _ex.submit(_tarefa_cred, "pdfs", processar_documentos, arquivos_bytes): "pdfs",
+                _ex.submit(_tarefa_cred, "dados", extrair_dados, texto_cred, arquivos_bytes, []): "dados",
+            }
+            _done = 0
+            for _f in _as_completed(_futures):
+                _n, _r, _e = _f.result()
+                _done += 1
+                barra.progress(int(_done/2*80), text=f"⚡ Processando... {_done}/2 tarefas concluídas")
+                if not _e: _res[_n] = _r
+
+        pdfs_gerados = _res.get("pdfs", [])
+        dados        = _res.get("dados", {})
         dados["nome_destinatario"] = nome_dest_input
-        barra.progress(85, text="✍️ Gerando email profissional...")
-        gerado = gerar_email(st.session_state.get("texto_bruto_credito",""), dados, pdfs_gerados)
+        barra.progress(90, text="✍️ Gerando email profissional...")
+        gerado = gerar_email(texto_cred, dados, pdfs_gerados)
         barra.progress(100, text="✅ Documentação pronta!")
         time.sleep(0.4); barra.empty()
         st.session_state["pdfs_gerados"] = pdfs_gerados
@@ -2334,27 +2364,56 @@ elif tipo_atendimento == "locacao":
                 result.append((arq.name, conteudo, tipo))
             return result
 
-        barra = st.progress(0, text="📄 Organizando documentos do Locador...")
+        barra = st.progress(0, text="⚡ Processando todos os documentos em paralelo...")
         # Lê todos os bytes UMA vez — Streamlit não permite reler após read()
         bytes_locador   = bytes_polo(upload_locador)
         bytes_locatario = bytes_polo(upload_locatario)
         bytes_fiador    = bytes_polo(upload_fiador) if upload_fiador else []
 
-        # Processar PDFs de cada polo isoladamente
-        pdfs_locador   = processar_documentos(bytes_locador)
-        barra.progress(20, text="📄 Organizando documentos do Locatário...")
-        pdfs_locatario = processar_documentos(bytes_locatario)
-        barra.progress(35, text="📄 Organizando documentos do Fiador..." if bytes_fiador else "🔍 Extraindo dados do Locador...")
-        pdfs_fiador    = processar_documentos(bytes_fiador) if bytes_fiador else []
-
-        # Extração isolada por polo
-        barra.progress(45, text="🔍 Extraindo dados do Locador...")
         texto_loc_val = st.session_state.get("texto_locacao","")
-        dados_locador_ext   = extrair_dados_polo(bytes_locador,   "locador",   texto_loc_val)
-        barra.progress(58, text="🔍 Extraindo dados do Locatário...")
-        dados_locatario_ext = extrair_dados_polo(bytes_locatario, "locatario", texto_loc_val)
-        barra.progress(68, text="🔍 Extraindo dados do Fiador..." if bytes_fiador else "⚖️ Validando dados...")
-        dados_fiador_ext    = extrair_dados_polo(bytes_fiador,    "fiador",    texto_loc_val) if bytes_fiador else {}
+
+        # ── PROCESSAMENTO PARALELO — todas as chamadas à API ao mesmo tempo ──
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        resultados = {}
+        erros_thread = {}
+
+        def tarefa(nome, fn, *args):
+            try:
+                return nome, fn(*args), None
+            except Exception as e:
+                return nome, None, str(e)
+
+        tarefas = [
+            ("pdfs_locador",   processar_documentos, bytes_locador),
+            ("pdfs_locatario", processar_documentos, bytes_locatario),
+            ("dados_locador",  extrair_dados_polo,   bytes_locador,   "locador",   texto_loc_val),
+            ("dados_locatario",extrair_dados_polo,   bytes_locatario, "locatario", texto_loc_val),
+        ]
+        if bytes_fiador:
+            tarefas.append(("pdfs_fiador",  processar_documentos, bytes_fiador))
+            tarefas.append(("dados_fiador", extrair_dados_polo,   bytes_fiador, "fiador", texto_loc_val))
+
+        total = len(tarefas)
+        concluidas = 0
+        with ThreadPoolExecutor(max_workers=total) as executor:
+            futures = {executor.submit(tarefa, t[0], t[1], *t[2:]): t[0] for t in tarefas}
+            for future in as_completed(futures):
+                nome_t, resultado, erro = future.result()
+                concluidas += 1
+                pct = int((concluidas / total) * 80)
+                barra.progress(pct, text=f"⚡ Processando... {concluidas}/{total} tarefas concluídas")
+                if erro:
+                    erros_thread[nome_t] = erro
+                else:
+                    resultados[nome_t] = resultado
+
+        pdfs_locador   = resultados.get("pdfs_locador",   [])
+        pdfs_locatario = resultados.get("pdfs_locatario", [])
+        pdfs_fiador    = resultados.get("pdfs_fiador",    [])
+        dados_locador_ext   = resultados.get("dados_locador",   {})
+        dados_locatario_ext = resultados.get("dados_locatario", {})
+        dados_fiador_ext    = resultados.get("dados_fiador",    {}) if bytes_fiador else {}
 
         # Validações pós-extração — avisos, não bloqueios
         avisos_dados = []
