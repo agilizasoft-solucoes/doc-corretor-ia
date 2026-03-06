@@ -2100,80 +2100,89 @@ elif tipo_atendimento == "locacao":
           st.markdown(f"<span style='color:#C62828;font-size:12px;font-weight:600;'>{i}</span>", unsafe_allow_html=True)
 
   # ── BLOCO 01 — LOCADOR ──
-  st.markdown("""
-<div class='card-section' style='border-left-color:#1565C0;'>
-    <span class='step-number' style='background:#1565C0;'>01</span>
-    <p class='section-title'>🧑‍💼 Documentos do LOCADOR</p>
-    <p class='section-subtitle'>Proprietário do imóvel — RG/CNH, CPF, comprovante de estado civil, comprovante de endereço</p>
-</div>
-""", unsafe_allow_html=True)
-  upload_locador = st.file_uploader(
-      "Arraste os documentos do Locador",
-      accept_multiple_files=True,
-      type=["jpg","jpeg","png","bmp","webp","tiff","pdf"],
-      key="upload_locador",
-      label_visibility="collapsed"
-  )
-  if upload_locador:
-      dados_loc_preview = st.session_state.get("preview_locador", {})
-      if dados_loc_preview:
-          ok_l, falta_l = mini_checklist_polo(dados_loc_preview, "locador")
-          with st.expander("📋 Dados identificados — Locador", expanded=False):
-              render_mini_checklist(ok_l, falta_l)
-      else:
-          st.caption(f"📎 {len(upload_locador)} arquivo(s) do locador selecionado(s)")
+  with st.container(border=True):
+      st.markdown("""
+      <div style='display:flex;align-items:center;gap:10px;margin-bottom:4px;'>
+          <span style='background:#1565C0;color:white;font-size:12px;font-weight:700;
+              padding:3px 10px;border-radius:20px;'>01</span>
+          <span style='font-size:15px;font-weight:700;color:#1A1A2E;'>🧑‍💼 Documentos do LOCADOR</span>
+      </div>
+      <div style='font-size:12px;color:#5C6B7A;margin-bottom:8px;'>
+          Proprietário do imóvel — RG/CNH, CPF, comprovante de estado civil, comprovante de endereço
+      </div>
+      """, unsafe_allow_html=True)
+      upload_locador = st.file_uploader(
+          "Arraste ou clique para selecionar os documentos do Locador",
+          accept_multiple_files=True,
+          type=["jpg","jpeg","png","bmp","webp","tiff","pdf"],
+          key="upload_locador",
+      )
+      if upload_locador:
+          dados_loc_preview = st.session_state.get("preview_locador", {})
+          if dados_loc_preview:
+              ok_l, falta_l = mini_checklist_polo(dados_loc_preview, "locador")
+              with st.expander("📋 Dados identificados — Locador", expanded=False):
+                  render_mini_checklist(ok_l, falta_l)
+          else:
+              st.caption(f"📎 {len(upload_locador)} arquivo(s) do locador selecionado(s)")
 
   # ── BLOCO 02 — LOCATÁRIO ──
-  st.markdown("""
-<div class='card-section' style='border-left-color:#2E7D32;'>
-    <span class='step-number' style='background:#2E7D32;'>02</span>
-    <p class='section-title'>🧑‍💼 Documentos do LOCATÁRIO</p>
-    <p class='section-subtitle'>Inquilino — RG/CNH, CPF, comprovante de renda, comprovante de residência</p>
-</div>
-""", unsafe_allow_html=True)
-  upload_locatario = st.file_uploader(
-      "Arraste os documentos do Locatário",
-      accept_multiple_files=True,
-      type=["jpg","jpeg","png","bmp","webp","tiff","pdf"],
-      key="upload_locatario",
-      label_visibility="collapsed"
-  )
-  if upload_locatario:
-      dados_locat_preview = st.session_state.get("preview_locatario", {})
-      if dados_locat_preview:
-          ok_lt, falta_lt = mini_checklist_polo(dados_locat_preview, "locatario")
-          with st.expander("📋 Dados identificados — Locatário", expanded=False):
-              render_mini_checklist(ok_lt, falta_lt)
-      else:
-          st.caption(f"📎 {len(upload_locatario)} arquivo(s) do locatário selecionado(s)")
+  with st.container(border=True):
+      st.markdown("""
+      <div style='display:flex;align-items:center;gap:10px;margin-bottom:4px;'>
+          <span style='background:#2E7D32;color:white;font-size:12px;font-weight:700;
+              padding:3px 10px;border-radius:20px;'>02</span>
+          <span style='font-size:15px;font-weight:700;color:#1A1A2E;'>🔑 Documentos do LOCATÁRIO</span>
+      </div>
+      <div style='font-size:12px;color:#5C6B7A;margin-bottom:8px;'>
+          Inquilino — RG/CNH, CPF, comprovante de renda, comprovante de residência
+      </div>
+      """, unsafe_allow_html=True)
+      upload_locatario = st.file_uploader(
+          "Arraste ou clique para selecionar os documentos do Locatário",
+          accept_multiple_files=True,
+          type=["jpg","jpeg","png","bmp","webp","tiff","pdf"],
+          key="upload_locatario",
+      )
+      if upload_locatario:
+          dados_locat_preview = st.session_state.get("preview_locatario", {})
+          if dados_locat_preview:
+              ok_lt, falta_lt = mini_checklist_polo(dados_locat_preview, "locatario")
+              with st.expander("📋 Dados identificados — Locatário", expanded=False):
+                  render_mini_checklist(ok_lt, falta_lt)
+          else:
+              st.caption(f"📎 {len(upload_locatario)} arquivo(s) do locatário selecionado(s)")
 
   # ── BLOCO 03 — FIADOR (condicional) ──
   tem_fiador = st.checkbox("🤝 Há fiador neste contrato?", key="tem_fiador_check")
 
   upload_fiador = []
   if tem_fiador:
-      st.markdown("""
-<div class='card-section' style='border-left-color:#E65100;'>
-    <span class='step-number' style='background:#E65100;'>03</span>
-    <p class='section-title'>🧑‍💼 Documentos do FIADOR</p>
-    <p class='section-subtitle'>Garantidor — RG/CNH, CPF, comprovante de renda, residência e documento do imóvel próprio</p>
-</div>
-""", unsafe_allow_html=True)
-      upload_fiador = st.file_uploader(
-          "Arraste os documentos do Fiador",
-          accept_multiple_files=True,
-          type=["jpg","jpeg","png","bmp","webp","tiff","pdf"],
-          key="upload_fiador",
-          label_visibility="collapsed"
-      )
-      if upload_fiador:
-          dados_fiador_preview = st.session_state.get("preview_fiador", {})
-          if dados_fiador_preview:
-              ok_f, falta_f = mini_checklist_polo(dados_fiador_preview, "fiador")
-              with st.expander("📋 Dados identificados — Fiador", expanded=False):
-                  render_mini_checklist(ok_f, falta_f)
-          else:
-              st.caption(f"📎 {len(upload_fiador)} arquivo(s) do fiador selecionado(s)")
+      with st.container(border=True):
+          st.markdown("""
+          <div style='display:flex;align-items:center;gap:10px;margin-bottom:4px;'>
+              <span style='background:#E65100;color:white;font-size:12px;font-weight:700;
+                  padding:3px 10px;border-radius:20px;'>03</span>
+              <span style='font-size:15px;font-weight:700;color:#1A1A2E;'>🤝 Documentos do FIADOR</span>
+          </div>
+          <div style='font-size:12px;color:#5C6B7A;margin-bottom:8px;'>
+              Garantidor — RG/CNH, CPF, comprovante de renda, residência e documento do imóvel próprio
+          </div>
+          """, unsafe_allow_html=True)
+          upload_fiador = st.file_uploader(
+              "Arraste ou clique para selecionar os documentos do Fiador",
+              accept_multiple_files=True,
+              type=["jpg","jpeg","png","bmp","webp","tiff","pdf"],
+              key="upload_fiador",
+          )
+          if upload_fiador:
+              dados_fiador_preview = st.session_state.get("preview_fiador", {})
+              if dados_fiador_preview:
+                  ok_f, falta_f = mini_checklist_polo(dados_fiador_preview, "fiador")
+                  with st.expander("📋 Dados identificados — Fiador", expanded=False):
+                      render_mini_checklist(ok_f, falta_f)
+              else:
+                  st.caption(f"📎 {len(upload_fiador)} arquivo(s) do fiador selecionado(s)")
 
   # ── BLOCO 04 — Informações adicionais ──
   step_info = "04" if not tem_fiador else "04"
@@ -2640,6 +2649,9 @@ elif tipo_atendimento == "locacao":
         time.sleep(0.4); barra.empty()
 
         st.session_state["pdfs_gerados_loc"]    = pdfs_loc
+        st.session_state["pdfs_polo_locador"]   = pdfs_locador
+        st.session_state["pdfs_polo_locatario"] = pdfs_locatario
+        st.session_state["pdfs_polo_fiador"]    = pdfs_fiador
         st.session_state["email_gerado_loc"]    = email_loc
         st.session_state["dados_loc"]           = dados_loc
         st.session_state["dados_locador"]       = dados_locador_ext
@@ -2716,30 +2728,93 @@ elif tipo_atendimento == "locacao":
     st.markdown("""
     <div class='card-section-neutral'>
         <p class='section-title'>✅ Documentação organizada e pronta</p>
-        <p class='section-subtitle'>Confira os arquivos gerados — desmarque duplicatas se necessário</p>
+        <p class='section-subtitle'>Baixe por polo ou tudo de uma vez — o ZIP completo já vem com pastas separadas</p>
     </div>
     """, unsafe_allow_html=True)
-    selecionados_loc = []
-    for idx, (nome, conteudo) in enumerate(pdfs_loc):
-        col1, col2 = st.columns([0.7, 0.3])
-        with col1:
-            marcado = st.checkbox(f"📎 {nome}", value=True, key=f"cb_loc_{idx}_{nome[:30]}")
-        with col2:
-            st.download_button("⬇️ Baixar", data=conteudo, file_name=nome,
-                               mime="application/pdf", key=f"dl_loc_{idx}_{nome[:30]}")
-        if marcado: selecionados_loc.append((nome, conteudo))
-    if selecionados_loc:
-        zip_buf = io.BytesIO()
-        with zipfile.ZipFile(zip_buf, "w") as zf:
-            for nome, conteudo in selecionados_loc:
-                zf.writestr(nome, conteudo)
-            # Incluir termo de vistoria no ZIP se gerado
-            if termo_vis_bytes:
-                zf.writestr("Termo_Vistoria_Inicial.pdf", termo_vis_bytes)
-        zip_buf.seek(0)
-        st.download_button("⬇️ Baixar toda a documentação em ZIP", data=zip_buf,
-                           file_name="documentos_inquilino.zip", mime="application/zip",
-                           use_container_width=True, key="zip_loc")
+
+    # Recuperar PDFs por polo
+    pdfs_polo_locador   = st.session_state.get("pdfs_polo_locador",   [])
+    pdfs_polo_locatario = st.session_state.get("pdfs_polo_locatario", [])
+    pdfs_polo_fiador    = st.session_state.get("pdfs_polo_fiador",    [])
+
+    def _fazer_zip(lista_pdfs, pasta="", extras=None):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            for nome, conteudo in lista_pdfs:
+                zf.writestr(f"{pasta}{nome}" if pasta else nome, conteudo)
+            if extras:
+                for nome_e, conteudo_e in extras:
+                    zf.writestr(f"{pasta}{nome_e}" if pasta else nome_e, conteudo_e)
+        buf.seek(0)
+        return buf
+
+    # ── Botões por polo ──
+    # Fiador só aparece se o checkbox "tem_fiador" foi marcado no formulário
+    tem_fiador_ativo = st.session_state.get("tem_fiador_check", False)
+
+    colunas_polo = [1, 1, 1] if tem_fiador_ativo else [1, 1]
+    cols_polo = st.columns(colunas_polo)
+
+    with cols_polo[0]:
+        st.markdown("<div style='text-align:center;font-size:12px;font-weight:700;color:#1565C0;margin-bottom:6px;'>🏠 LOCADOR</div>", unsafe_allow_html=True)
+        if pdfs_polo_locador:
+            for idx, (nome, conteudo) in enumerate(pdfs_polo_locador):
+                st.download_button(f"📄 {nome[:28]}", data=conteudo, file_name=nome,
+                                   mime="application/pdf", key=f"dl_loc_arq_{idx}", use_container_width=True)
+            zip_loc_polo = _fazer_zip(pdfs_polo_locador)
+            st.download_button("⬇️ ZIP — Locador", data=zip_loc_polo,
+                               file_name="Documentos_Locador.zip", mime="application/zip",
+                               use_container_width=True, key="zip_polo_locador")
+        else:
+            st.caption("Nenhum arquivo")
+
+    with cols_polo[1]:
+        st.markdown("<div style='text-align:center;font-size:12px;font-weight:700;color:#2E7D32;margin-bottom:6px;'>🔑 LOCATÁRIO</div>", unsafe_allow_html=True)
+        if pdfs_polo_locatario:
+            for idx, (nome, conteudo) in enumerate(pdfs_polo_locatario):
+                st.download_button(f"📄 {nome[:28]}", data=conteudo, file_name=nome,
+                                   mime="application/pdf", key=f"dl_locat_arq_{idx}", use_container_width=True)
+            zip_locat_polo = _fazer_zip(pdfs_polo_locatario)
+            st.download_button("⬇️ ZIP — Locatário", data=zip_locat_polo,
+                               file_name="Documentos_Locatario.zip", mime="application/zip",
+                               use_container_width=True, key="zip_polo_locatario")
+        else:
+            st.caption("Nenhum arquivo")
+
+    if tem_fiador_ativo:
+        with cols_polo[2]:
+            st.markdown("<div style='text-align:center;font-size:12px;font-weight:700;color:#E65100;margin-bottom:6px;'>🤝 FIADOR</div>", unsafe_allow_html=True)
+            if pdfs_polo_fiador:
+                for idx, (nome, conteudo) in enumerate(pdfs_polo_fiador):
+                    st.download_button(f"📄 {nome[:28]}", data=conteudo, file_name=nome,
+                                       mime="application/pdf", key=f"dl_fiad_arq_{idx}", use_container_width=True)
+                zip_fiad_polo = _fazer_zip(pdfs_polo_fiador)
+                st.download_button("⬇️ ZIP — Fiador", data=zip_fiad_polo,
+                                   file_name="Documentos_Fiador.zip", mime="application/zip",
+                                   use_container_width=True, key="zip_polo_fiador")
+            else:
+                st.caption("Nenhum arquivo")
+
+    # ── ZIP completo com pastas separadas ──
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+    extras_completo = [("Vistoria/Termo_Vistoria_Inicial.pdf", termo_vis_bytes)] if termo_vis_bytes else []
+    lista_zip_completo = (
+        [(f"Locador/{n}",   c) for n,c in pdfs_polo_locador] +
+        [(f"Locatario/{n}", c) for n,c in pdfs_polo_locatario] +
+        ([(f"Fiador/{n}",   c) for n,c in pdfs_polo_fiador] if tem_fiador_ativo else [])
+    )
+    zip_completo = _fazer_zip(lista_zip_completo, extras=extras_completo)
+    st.download_button(
+        "⬇️ Baixar TODA a documentação em ZIP (com pastas por polo)",
+        data=zip_completo,
+        file_name="Documentacao_Completa_Locacao.zip",
+        mime="application/zip",
+        use_container_width=True,
+        key="zip_completo_loc"
+    )
+
+    # ── Lista para envio por email ──
+    selecionados_loc = pdfs_polo_locador + pdfs_polo_locatario + (pdfs_polo_fiador if tem_fiador_ativo else [])
 
     # — Termo de Vistoria —
     if termo_vis_bytes:
