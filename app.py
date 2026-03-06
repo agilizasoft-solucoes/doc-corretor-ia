@@ -3184,7 +3184,7 @@ elif tipo_atendimento == "locacao":
             _bloco_polo("🤝 FIADOR", "#E65100", pdfs_polo_fiador,   "fiador")
 
     # ── ZIP completo ──
-    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
     extras_completo = [("Vistoria/Termo_Vistoria_Inicial.pdf", termo_vis_bytes)] if termo_vis_bytes else []
     lista_zip_completo = (
         [(f"Locador/{n}",   c) for n,c in pdfs_polo_locador] +
@@ -3192,22 +3192,32 @@ elif tipo_atendimento == "locacao":
         ([(f"Fiador/{n}",   c) for n,c in pdfs_polo_fiador] if tem_fiador_ativo else [])
     )
     zip_completo = _fazer_zip(lista_zip_completo, extras=extras_completo)
+    st.markdown("""
+    <div style='background:#F5F5F5;border:1px solid #DEDEDE;border-radius:10px;padding:14px 18px;margin:6px 0;'>
+        <span style='font-weight:600;color:#333;font-size:0.95rem;'>📦 Download completo</span>
+        <span style='font-size:0.82rem;color:#777;margin-left:8px;'>— ZIP com pastas separadas por polo</span>
+    </div>
+    """, unsafe_allow_html=True)
     st.download_button(
-        "⬇️ Baixar TODA a documentação em ZIP (com pastas por polo)",
+        "⬇️ Baixar TODA a documentação em ZIP",
         data=zip_completo, file_name="Documentacao_Completa_Locacao.zip",
         mime="application/zip", use_container_width=True, key="zip_completo_loc")
 
     # — Termo de Vistoria —
     if termo_vis_bytes:
-        col_vis_dl, col_vis_cb = st.columns([0.6, 0.4])
+        st.markdown("""
+        <div style='background:#F0F7FF;border:1px solid #C5DCF5;border-radius:10px;padding:14px 18px;margin:10px 0 4px 0;'>
+            <span style='font-weight:600;color:#1565C0;font-size:0.95rem;'>📋 Termo de Vistoria Inicial</span>
+            {}
+        </div>
+        """.format(f"<span style='font-size:0.82rem;color:#555;margin-left:10px;'>📷 {len(fotos_nomes_loc)} foto(s) anexada(s)</span>" if fotos_nomes_loc else ""), unsafe_allow_html=True)
+        col_vis_dl, col_vis_cb = st.columns([1, 1])
         with col_vis_dl:
             st.download_button("⬇️ Baixar Termo de Vistoria (PDF)", data=termo_vis_bytes,
                                file_name="Termo_Vistoria_Inicial.pdf", mime="application/pdf",
                                use_container_width=True, key="dl_vistoria")
         with col_vis_cb:
-            incluir_vistoria_email = st.checkbox("📋 Incluir Termo de Vistoria no email", value=True, key="sel_vistoria_email")
-        if fotos_nomes_loc:
-            st.caption(f"📷 Total de fotos: {len(fotos_nomes_loc)}")
+            incluir_vistoria_email = st.checkbox("📧 Incluir no email ao destinatário", value=True, key="sel_vistoria_email")
         if incluir_vistoria_email:
             selecionados_loc.append(("Termo_Vistoria_Inicial.pdf", termo_vis_bytes))
     else:
