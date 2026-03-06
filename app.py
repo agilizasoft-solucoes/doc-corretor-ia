@@ -372,8 +372,8 @@ def check_login():
         st.stop()
 
     if not st.session_state.get("autenticado", False):
-        st.markdown("<style>section[data-testid='stMain'] > div{max-width:420px;margin:70px auto;}</style>", unsafe_allow_html=True)
-        exibir_logo(altura=240, largura_max=340)
+        st.markdown("<style>section[data-testid='stMain'] > div{max-width:480px;margin:40px auto;}</style>", unsafe_allow_html=True)
+        exibir_logo(altura=380, largura_max=460)
         st.caption("<div style='text-align:center'>Sistema de organização de documentos para financiamento</div>", unsafe_allow_html=True)
         st.divider()
         tela = st.radio("", ["🔑 Entrar","🔓 Esqueci minha senha"], horizontal=True, label_visibility="collapsed")
@@ -434,28 +434,24 @@ st.markdown("""
 
     /* ── Barra de conta discreta ── */
     [data-testid="stPopover"] > button {
-        font-size: 0.7rem !important;
-        font-weight: 400 !important;
-        padding: 1px 8px !important;
-        min-height: 0 !important;
-        height: 22px !important;
-        line-height: 1 !important;
-        border-radius: 11px !important;
+        font-size: 0.82rem !important;
+        font-weight: 500 !important;
+        padding: 6px 14px !important;
+        min-height: 36px !important;
+        border-radius: 8px !important;
         border: 1px solid #D0D0D0 !important;
-        background: transparent !important;
-        color: #999 !important;
+        background: #FAFAFA !important;
+        color: #666 !important;
         box-shadow: none !important;
-        white-space: nowrap !important;
+        width: 100% !important;
     }
     [data-testid="stPopover"] > button:hover {
-        background: #F5F5F5 !important;
-        color: #444 !important;
+        background: #F0F0F0 !important;
+        color: #333 !important;
         border-color: #AAA !important;
     }
-    /* Forçar que o botão popover não quebre o texto */
     [data-testid="stPopover"] > button p {
-        font-size: 0.7rem !important;
-        line-height: 1 !important;
+        font-size: 0.82rem !important;
         margin: 0 !important;
         white-space: nowrap !important;
     }
@@ -2163,10 +2159,10 @@ if "tipo_atendimento" not in st.session_state:
 
     # ── Barra de conta (tela inicial) ──
     st.divider()
-    _bi_e, _bi_cfg, _bi_sup, _bi_out = st.columns([5, 0.9, 1.0, 0.8])
+    _bi_e, _bi_cfg, _bi_sup, _bi_out = st.columns([1, 2, 2, 2])
 
     with _bi_cfg:
-        with st.popover("⚙️ email"):
+        with st.popover("⚙️ Configurar Email", use_container_width=True):
             st.caption("**Configuração de envio de email**")
             _cfg_d = st.text_input("📧 Email destino",         value=st.session_state.get("cfg_destino",""),   placeholder="destinatario@email.com", key="cfg_d_home")
             _cfg_r = st.text_input("📤 Seu Gmail (remetente)", value=st.session_state.get("cfg_remetente",""), placeholder="seuemail@gmail.com",     key="cfg_r_home")
@@ -2179,7 +2175,7 @@ if "tipo_atendimento" not in st.session_state:
                 st.success("✅ Salvo!")
 
     with _bi_sup:
-        with st.popover("🔧 suporte"):
+        with st.popover("🔧 Suporte Técnico", use_container_width=True):
             st.caption("**Diagnóstico técnico**")
             st.caption("Baixe e envie ao suporte.")
             import sys, platform
@@ -2212,7 +2208,7 @@ if "tipo_atendimento" not in st.session_state:
                 mime="text/plain", use_container_width=True, key="dl_diag_home")
 
     with _bi_out:
-        if st.button("🚪 sair", key="sair_home"):
+        if st.button("🚪 Sair da conta", use_container_width=True, key="sair_home"):
             for _k in ["autenticado","cliente","cfg_destino","cfg_remetente","cfg_senha",
                        "pdfs_gerados","email_gerado","processado","dados",
                        "pdfs_gerados_loc","email_gerado_loc","processado_loc","dados_loc","tipo_atendimento"]:
@@ -3598,9 +3594,9 @@ st.divider()
 _em_servico = st.session_state.get("tipo_atendimento") in ("credito", "locacao")
 
 if _em_servico:
-    _cs1, _cs2 = st.columns([8, 0.8])
+    _cs1, _cs2, _cs3 = st.columns([1, 2, 1])
     with _cs2:
-        if st.button("🚪 sair", key="sair_rodape"):
+        if st.button("🚪 Sair da conta", use_container_width=True, key="sair_rodape"):
             for k in ["autenticado","cliente","cfg_destino","cfg_remetente","cfg_senha",
                       "pdfs_gerados","email_gerado","processado","dados",
                       "pdfs_gerados_loc","email_gerado_loc","processado_loc","dados_loc","tipo_atendimento"]:
@@ -3608,10 +3604,10 @@ if _em_servico:
             st.query_params.clear()
             st.rerun()
 else:
-    _ce, _ccfg, _csup, _clogout = st.columns([5, 0.8, 0.9, 0.7])
+    _ce, _ccfg, _csup, _clogout = st.columns([1, 2, 2, 2])
 
     with _ccfg:
-        with st.popover("⚙️ email"):
+        with st.popover("⚙️ Configurar Email", use_container_width=True):
             st.caption("**Configuração de envio de email**")
             cfg_destino_r   = st.text_input("📧 Email destino",         value=st.session_state.get("cfg_destino",""),   placeholder="destinatario@email.com", key="cfg_destino_rod")
             cfg_remetente_r = st.text_input("📤 Seu Gmail (remetente)", value=st.session_state.get("cfg_remetente",""), placeholder="seuemail@gmail.com",     key="cfg_remetente_rod")
@@ -3624,7 +3620,7 @@ else:
                 st.success("✅ Salvo!")
 
     with _csup:
-        with st.popover("🔧 suporte"):
+        with st.popover("🔧 Suporte Técnico", use_container_width=True):
             st.caption("**Diagnóstico técnico**")
             st.caption("Baixe e envie ao suporte.")
             import sys, platform
@@ -3697,7 +3693,7 @@ else:
             )
 
     with _clogout:
-        if st.button("🚪 sair", key="sair_rodape"):
+        if st.button("🚪 Sair da conta", use_container_width=True, key="sair_rodape"):
             for k in ["autenticado","cliente","cfg_destino","cfg_remetente","cfg_senha",
                       "pdfs_gerados","email_gerado","processado","dados",
                       "pdfs_gerados_loc","email_gerado_loc","processado_loc","dados_loc","tipo_atendimento"]:
