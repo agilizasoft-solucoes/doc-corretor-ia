@@ -83,19 +83,26 @@ def registrar_uso(cliente, qtd_arquivos=0, email_enviado=False):
 # ══════════════════════════════════════════════════════
 # HISTÓRICO DE ATENDIMENTOS
 # ══════════════════════════════════════════════════════
-def registrar_historico(cliente, tipo, nome_locatario="", nome_locador="", score=None, status="Finalizado"):
+def registrar_historico(cliente, tipo, nome_locatario="", nome_locador="",
+                        score=None, status="Finalizado",
+                        contrato_gerado=False, email_enviado=False,
+                        endereco_imovel="", valor_aluguel=""):
     """Salva atendimento no Supabase tabela historico_atendimentos."""
     from datetime import datetime as _dt
     try:
         payload = {
-            "cliente_id":    cliente.get("id"),
-            "cliente_login": cliente.get("login"),
-            "tipo":          tipo,
-            "nome_locatario": nome_locatario[:120] if nome_locatario else "",
-            "nome_locador":   nome_locador[:120]   if nome_locador   else "",
-            "score_risco":    score,
-            "status":         status,
-            "criado_em":      _dt.now().isoformat(),
+            "cliente_id":      cliente.get("id"),
+            "cliente_login":   cliente.get("login"),
+            "tipo":            tipo,
+            "nome_locatario":  nome_locatario[:120] if nome_locatario else "",
+            "nome_locador":    nome_locador[:120]   if nome_locador   else "",
+            "score_risco":     score,
+            "status":          status,
+            "contrato_gerado": contrato_gerado,
+            "email_enviado":   email_enviado,
+            "endereco_imovel": endereco_imovel[:200] if endereco_imovel else "",
+            "valor_aluguel":   str(valor_aluguel)[:30] if valor_aluguel else "",
+            "criado_em":       _dt.now().isoformat(),
         }
         requests.post(
             f"{SUPABASE_URL}/rest/v1/historico_atendimentos",
@@ -104,6 +111,18 @@ def registrar_historico(cliente, tipo, nome_locatario="", nome_locador="", score
         )
     except Exception as e:
         _log_erro("registrar_historico", e)
+
+def atualizar_historico(cliente_id, criado_em, **kwargs):
+    """Atualiza registro existente — ex: marca contrato_gerado=True após gerar."""
+    try:
+        requests.patch(
+            f"{SUPABASE_URL}/rest/v1/historico_atendimentos"
+            f"?cliente_id=eq.{cliente_id}&criado_em=eq.{criado_em}",
+            headers={**SB_HEADERS, "Content-Type": "application/json"},
+            json=kwargs, timeout=8
+        )
+    except Exception as e:
+        _log_erro("atualizar_historico", e)
 
 def buscar_historico(cliente_id, limite=20):
     """Retorna últimos atendimentos do cliente."""
@@ -2051,40 +2070,68 @@ if "tipo_atendimento" not in st.session_state:
     _cli_hist = st.session_state.get("cliente", {})
     if _cli_hist.get("id"):
         st.divider()
-        with st.expander("📋 Histórico de Atendimentos", expanded=False):
-            _hist = buscar_historico(_cli_hist["id"], limite=20)
+        with st.expander("📋 Histórico de Atendimentos", expanded=True):
+            _hist = buscar_historico(_cli_hist["id"], limite=30)
             if _hist:
-                _cores_tipo = {"Locação":"#2E7D32","Crédito Imobiliário":"#1565C0"}
+                _cores_tipo  = {"Locação":"#2E7D32","Crédito Imobiliário":"#1565C0"}
                 _cores_score = {"BAIXO":"#2E7D32","MÉDIO":"#E65100","ALTO":"#C62828"}
+                _cores_status = {
+                    "Em andamento": "#E65100",
+                    "Contrato Gerado": "#1565C0",
+                    "Email Enviado": "#2E7D32",
+                    "Finalizado": "#555",
+                }
                 for _h in _hist:
-                    _tipo_h   = _h.get("tipo","?")
-                    _cor_h    = _cores_tipo.get(_tipo_h,"#555")
-                    _nome_h   = _h.get("nome_locatario") or _h.get("nome_locador","—")
-                    _data_h   = _h.get("criado_em","")[:10]
-                    _status_h = _h.get("status","?")
-                    _score_h  = _h.get("score_risco")
+                    _tipo_h    = _h.get("tipo","?")
+                    _cor_h     = _cores_tipo.get(_tipo_h,"#555")
+                    _nome_loct = _h.get("nome_locatario","") or "—"
+                    _nome_loc  = _h.get("nome_locador","")  or "—"
+                    _data_h    = _h.get("criado_em","")[:10]
+                    _hora_h    = _h.get("criado_em","")[11:16]
+                    _status_h  = _h.get("status","?")
+                    _cor_st    = _cores_status.get(_status_h,"#888")
+                    _end_h     = _h.get("endereco_imovel","")
+                    _val_h     = _h.get("valor_aluguel","")
+                    _score_h   = _h.get("score_risco")
+                    _cont_h    = _h.get("contrato_gerado", False)
+                    _email_h   = _h.get("email_enviado",  False)
+
+                    # badges contrato e email
+                    _badge_cont  = "<span style='background:#1565C0;color:white;font-size:9px;padding:1px 6px;border-radius:8px;margin-left:4px;'>📄 Contrato</span>" if _cont_h else ""
+                    _badge_email = "<span style='background:#2E7D32;color:white;font-size:9px;padding:1px 6px;border-radius:8px;margin-left:4px;'>📧 Email enviado</span>" if _email_h else ""
+
+                    # score
                     _score_txt = ""
                     if _score_h is not None:
                         _nivel_h = "BAIXO" if _score_h >= 70 else ("MÉDIO" if _score_h >= 40 else "ALTO")
                         _cor_sh  = _cores_score[_nivel_h]
-                        _score_txt = (
-                            f" &nbsp;·&nbsp; <span style='color:{_cor_sh};"
-                            f"font-weight:700;'>Score {_score_h}/100</span>"
-                        )
+                        _score_txt = f"<span style='color:{_cor_sh};font-weight:700;font-size:11px;'>● {_nivel_h} ({_score_h}/100)</span> &nbsp;"
+
+                    # linha de detalhes
+                    _detalhes = []
+                    if _end_h:  _detalhes.append(f"🏠 {_end_h}")
+                    if _val_h:  _detalhes.append(f"R$ {_val_h}")
+                    _det_txt = " &nbsp;·&nbsp; ".join(_detalhes)
+
                     st.markdown(
-                        f"<div style='border-left:3px solid {_cor_h};"
-                        f"padding:8px 12px;margin-bottom:6px;border-radius:0 6px 6px 0;"
-                        f"background:#FAFAFA;'>"
-                        f"<span style='font-size:12px;font-weight:700;color:{_cor_h};'>"
-                        f"{_tipo_h}</span>"
-                        f"<span style='font-size:12px;color:#1A1A2E;'> · {_nome_h}</span>"
-                        f"<span style='font-size:11px;color:#5C6B7A;'> · {_data_h}</span>"
+                        f"<div style='border-left:3px solid {_cor_h};padding:10px 14px;"
+                        f"margin-bottom:8px;border-radius:0 8px 8px 0;background:#FAFAFA;'>"
+                        f"<div style='display:flex;justify-content:space-between;align-items:center;'>"
+                        f"<span style='font-size:12px;font-weight:700;color:{_cor_h};'>{_tipo_h}</span>"
+                        f"<span style='font-size:10px;color:#888;'>{_data_h} {_hora_h}</span>"
+                        f"</div>"
+                        f"<div style='font-size:13px;font-weight:600;color:#1A1A2E;margin:3px 0 2px 0;'>"
+                        f"🔑 {_nome_loct} &nbsp;<span style='font-size:11px;color:#5C6B7A;font-weight:400;'>"
+                        f"(Loc: {_nome_loc})</span></div>"
+                        f"<div style='font-size:11px;color:#5C6B7A;margin-bottom:4px;'>{_det_txt}</div>"
+                        f"<div style='display:flex;align-items:center;gap:4px;flex-wrap:wrap;'>"
                         f"{_score_txt}"
-                        f"<span style='float:right;font-size:10px;color:#888;'>{_status_h}</span>"
-                        f"</div>",
+                        f"<span style='font-size:10px;font-weight:700;color:{_cor_st};'>{_status_h}</span>"
+                        f"{_badge_cont}{_badge_email}"
+                        f"</div></div>",
                         unsafe_allow_html=True)
             else:
-                st.caption("Nenhum atendimento registrado ainda.")
+                st.caption("Nenhum atendimento registrado ainda — processe o primeiro para começar.")
 
     st.stop()
 
@@ -2953,13 +3000,21 @@ elif tipo_atendimento == "locacao":
         if cliente_sess:
             total_arqs = len(bytes_locador) + len(bytes_locatario) + len(bytes_fiador)
             registrar_uso(cliente_sess, qtd_arquivos=total_arqs)
+            _score_val = st.session_state.get("score_risco_loc",{})
+            _end_imovel = imovel_dados.get("logradouro","") or imovel_dados.get("endereco_completo","")
+            _hist_criado = __import__("datetime").datetime.now().isoformat()
+            st.session_state["hist_criado_em"] = _hist_criado
             registrar_historico(
                 cliente_sess,
                 tipo="Locação",
                 nome_locatario=dados_locatario_ext.get("nome_completo",""),
                 nome_locador=dados_locador_ext.get("nome_completo",""),
-                score=st.session_state.get("score_risco_loc",{}).get("score") if st.session_state.get("score_risco_loc") else None,
-                status="Finalizado"
+                score=_score_val.get("score") if _score_val else None,
+                status="Em andamento",
+                contrato_gerado=False,
+                email_enviado=False,
+                endereco_imovel=_end_imovel,
+                valor_aluguel=imovel_dados.get("valor_aluguel",""),
             )
 
   if st.session_state.get("processado_loc"):
@@ -3315,6 +3370,11 @@ elif tipo_atendimento == "locacao":
                         imovel_rev, clausula_r, intermediacao=interm_r
                     )
                     st.session_state["contrato_gerado"] = contrato_bytes
+                    # Atualizar histórico: contrato gerado
+                    _cli_upd = st.session_state.get("cliente",{})
+                    _hem = st.session_state.get("hist_criado_em","")
+                    if _cli_upd.get("id") and _hem:
+                        atualizar_historico(_cli_upd["id"], _hem, contrato_gerado=True, status="Contrato Gerado")
                 st.success("✅ Contrato gerado com os dados revisados!")
                 st.session_state["revisao_aberta"] = False
                 st.rerun()
@@ -3446,6 +3506,10 @@ elif tipo_atendimento == "locacao":
                                 anexos.append((nome, conteudo))
                         enviar_email(anexos, destino, remetente, senha, assunto_loc_edit, corpo_loc_edit)
                     st.success(f"✅ Enviado para {destino} — {n_sel} arquivo(s) separados por polo.")
+                    _cli_em = st.session_state.get("cliente",{})
+                    _hem_e  = st.session_state.get("hist_criado_em","")
+                    if _cli_em.get("id") and _hem_e:
+                        atualizar_historico(_cli_em["id"], _hem_e, email_enviado=True, status="Email Enviado")
                     if cliente_sess_loc:
                         registrar_uso(cliente_sess_loc, qtd_arquivos=n_sel, email_enviado=True)
                 except smtplib.SMTPAuthenticationError:
