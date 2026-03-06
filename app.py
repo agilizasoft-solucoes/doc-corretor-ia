@@ -3068,10 +3068,10 @@ elif tipo_atendimento == "locacao":
             text-decoration:none;font-weight:700;margin-bottom:8px;font-size:14px;">
             🏆 Anual — R$ 75,00/mês &nbsp;·&nbsp; ⭐ Mais escolhido</a>""", unsafe_allow_html=True)
     else:
-        # Plano Pro ativo — botão de envio disponível após revisão do email
+        # Plano Pro ativo — 1 email com ZIP organizado por polo
         n_sel = len(selecionados_loc)
         if n_sel:
-            st.caption(f"📎 {n_sel} arquivo(s) selecionado(s) · assunto e corpo editados acima")
+            st.caption(f"📎 {n_sel} arquivo(s) selecionado(s) · 1 email com ZIP separado por polo")
         else:
             st.warning("⚠️ Nenhum arquivo selecionado — volte acima e marque ao menos um.")
         if st.button("📧 Enviar ao destinatário agora", type="primary",
@@ -3088,8 +3088,22 @@ elif tipo_atendimento == "locacao":
             else:
                 try:
                     with st.spinner("📧 Enviando documentação..."):
-                        enviar_email(selecionados_loc, destino, remetente, senha, assunto_loc_edit, corpo_loc_edit)
-                    st.success(f"✅ Documentação enviada para {destino} — {n_sel} arquivo(s) anexado(s).")
+                        # Prefixa cada arquivo com o polo — fica separado na caixa de entrada
+                        nomes_loc  = {n for n,_ in pdfs_polo_locador}
+                        nomes_loct = {n for n,_ in pdfs_polo_locatario}
+                        nomes_fiad = {n for n,_ in pdfs_polo_fiador}
+                        anexos = []
+                        for nome, conteudo in selecionados_loc:
+                            if nome in nomes_loc:
+                                anexos.append((f"[Locador] {nome}", conteudo))
+                            elif nome in nomes_loct:
+                                anexos.append((f"[Locatario] {nome}", conteudo))
+                            elif nome in nomes_fiad:
+                                anexos.append((f"[Fiador] {nome}", conteudo))
+                            else:
+                                anexos.append((nome, conteudo))
+                        enviar_email(anexos, destino, remetente, senha, assunto_loc_edit, corpo_loc_edit)
+                    st.success(f"✅ Enviado para {destino} — {n_sel} arquivo(s) separados por polo.")
                     if cliente_sess_loc:
                         registrar_uso(cliente_sess_loc, qtd_arquivos=n_sel, email_enviado=True)
                 except smtplib.SMTPAuthenticationError:
