@@ -2773,55 +2773,45 @@ elif tipo_atendimento == "locacao":
         buf.seek(0)
         return buf
 
-    # ── Botões por polo ──
-    # Fiador só aparece se o checkbox "tem_fiador" foi marcado no formulário
+    # ── Arquivos por polo com checkbox de seleção para envio ──
     tem_fiador_ativo = st.session_state.get("tem_fiador_check", False)
+    selecionados_loc = []
+
+    def _bloco_polo(label, cor, pdfs_lista, prefixo_key):
+        st.markdown(
+            f"<div style='font-size:12px;font-weight:700;color:{cor};"
+            f"margin-bottom:4px;'>{label}</div>",
+            unsafe_allow_html=True)
+        for idx, (nome, conteudo) in enumerate(pdfs_lista):
+            marcado = st.checkbox(
+                f"📄 {nome}", value=True,
+                key=f"sel_{prefixo_key}_{idx}")
+            if marcado:
+                selecionados_loc.append((nome, conteudo))
+        if pdfs_lista:
+            zip_b = _fazer_zip(pdfs_lista)
+            st.download_button(
+                f"⬇️ ZIP {label.split()[-1]}",
+                data=zip_b,
+                file_name=f"Documentos_{prefixo_key}.zip",
+                mime="application/zip",
+                use_container_width=True,
+                key=f"zip_{prefixo_key}")
+        else:
+            st.caption("Nenhum arquivo")
 
     colunas_polo = [1, 1, 1] if tem_fiador_ativo else [1, 1]
     cols_polo = st.columns(colunas_polo)
-
     with cols_polo[0]:
-        st.markdown("<div style='text-align:center;font-size:12px;font-weight:700;color:#1565C0;margin-bottom:6px;'>🏠 LOCADOR</div>", unsafe_allow_html=True)
-        if pdfs_polo_locador:
-            for idx, (nome, conteudo) in enumerate(pdfs_polo_locador):
-                st.download_button(f"📄 {nome[:28]}", data=conteudo, file_name=nome,
-                                   mime="application/pdf", key=f"dl_loc_arq_{idx}", use_container_width=True)
-            zip_loc_polo = _fazer_zip(pdfs_polo_locador)
-            st.download_button("⬇️ ZIP — Locador", data=zip_loc_polo,
-                               file_name="Documentos_Locador.zip", mime="application/zip",
-                               use_container_width=True, key="zip_polo_locador")
-        else:
-            st.caption("Nenhum arquivo")
-
+        _bloco_polo("🏠 LOCADOR",   "#1565C0", pdfs_polo_locador,   "locador")
     with cols_polo[1]:
-        st.markdown("<div style='text-align:center;font-size:12px;font-weight:700;color:#2E7D32;margin-bottom:6px;'>🔑 LOCATÁRIO</div>", unsafe_allow_html=True)
-        if pdfs_polo_locatario:
-            for idx, (nome, conteudo) in enumerate(pdfs_polo_locatario):
-                st.download_button(f"📄 {nome[:28]}", data=conteudo, file_name=nome,
-                                   mime="application/pdf", key=f"dl_locat_arq_{idx}", use_container_width=True)
-            zip_locat_polo = _fazer_zip(pdfs_polo_locatario)
-            st.download_button("⬇️ ZIP — Locatário", data=zip_locat_polo,
-                               file_name="Documentos_Locatario.zip", mime="application/zip",
-                               use_container_width=True, key="zip_polo_locatario")
-        else:
-            st.caption("Nenhum arquivo")
-
+        _bloco_polo("🔑 LOCATÁRIO", "#2E7D32", pdfs_polo_locatario, "locatario")
     if tem_fiador_ativo:
         with cols_polo[2]:
-            st.markdown("<div style='text-align:center;font-size:12px;font-weight:700;color:#E65100;margin-bottom:6px;'>🤝 FIADOR</div>", unsafe_allow_html=True)
-            if pdfs_polo_fiador:
-                for idx, (nome, conteudo) in enumerate(pdfs_polo_fiador):
-                    st.download_button(f"📄 {nome[:28]}", data=conteudo, file_name=nome,
-                                       mime="application/pdf", key=f"dl_fiad_arq_{idx}", use_container_width=True)
-                zip_fiad_polo = _fazer_zip(pdfs_polo_fiador)
-                st.download_button("⬇️ ZIP — Fiador", data=zip_fiad_polo,
-                                   file_name="Documentos_Fiador.zip", mime="application/zip",
-                                   use_container_width=True, key="zip_polo_fiador")
-            else:
-                st.caption("Nenhum arquivo")
+            _bloco_polo("🤝 FIADOR", "#E65100", pdfs_polo_fiador,   "fiador")
 
-    # ── ZIP completo com pastas separadas ──
-    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+    # ── ZIP completo ──
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
     extras_completo = [("Vistoria/Termo_Vistoria_Inicial.pdf", termo_vis_bytes)] if termo_vis_bytes else []
     lista_zip_completo = (
         [(f"Locador/{n}",   c) for n,c in pdfs_polo_locador] +
@@ -2831,41 +2821,8 @@ elif tipo_atendimento == "locacao":
     zip_completo = _fazer_zip(lista_zip_completo, extras=extras_completo)
     st.download_button(
         "⬇️ Baixar TODA a documentação em ZIP (com pastas por polo)",
-        data=zip_completo,
-        file_name="Documentacao_Completa_Locacao.zip",
-        mime="application/zip",
-        use_container_width=True,
-        key="zip_completo_loc"
-    )
-
-    # ── Seleção de arquivos para envio ──
-    st.divider()
-    st.markdown(
-        "<div style='font-size:14px;font-weight:700;color:#1A1A2E;margin-bottom:4px;'>"
-        "📨 Selecione os arquivos para envio ao destinatário</div>"
-        "<div style='font-size:12px;color:#5C6B7A;margin-bottom:10px;'>"
-        "Marque ou desmarque o que deseja anexar no email</div>",
-        unsafe_allow_html=True
-    )
-
-    todos_pdfs_loc = (
-        [(n, c, "Locador")   for n,c in pdfs_polo_locador]   +
-        [(n, c, "Locatário") for n,c in pdfs_polo_locatario] +
-        ([(n, c, "Fiador")   for n,c in pdfs_polo_fiador] if tem_fiador_ativo else [])
-    )
-    selecionados_loc = []
-    for idx, (nome, conteudo, polo_label) in enumerate(todos_pdfs_loc):
-        cor_polo = {"Locador":"#1565C0","Locatário":"#2E7D32","Fiador":"#E65100"}.get(polo_label,"#555")
-        col_cb, col_tag = st.columns([0.82, 0.18])
-        with col_cb:
-            marcado = st.checkbox(f"📄 {nome}", value=True, key=f"sel_env_loc_{idx}")
-        with col_tag:
-            st.markdown(
-                f"<span style='background:{cor_polo};color:white;font-size:10px;"
-                f"font-weight:700;padding:2px 8px;border-radius:10px;'>{polo_label}</span>",
-                unsafe_allow_html=True)
-        if marcado:
-            selecionados_loc.append((nome, conteudo))
+        data=zip_completo, file_name="Documentacao_Completa_Locacao.zip",
+        mime="application/zip", use_container_width=True, key="zip_completo_loc")
 
     # — Termo de Vistoria —
     if termo_vis_bytes:
