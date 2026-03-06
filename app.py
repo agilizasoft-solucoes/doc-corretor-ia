@@ -3505,102 +3505,133 @@ elif tipo_atendimento == "locacao":
             if key in st.session_state: del st.session_state[key]
         st.rerun()
 
-# ── Painel de configuração + Sair ──
+# ── Barra discreta de conta ──
 st.divider()
+st.markdown("""
+<style>
+.barra-conta .stButton > button {
+    font-size: 0.78rem !important;
+    padding: 4px 12px !important;
+    height: auto !important;
+    border-radius: 20px !important;
+    border: 1px solid #DDD !important;
+    background: #FAFAFA !important;
+    color: #555 !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
-with st.expander("📤 Configuração de envio de email", expanded=False):
-    st.caption("Configure uma vez e envie documentos ao correspondente com 1 clique.")
-    cfg_destino_r   = st.text_input("📧 Email destino",         value=st.session_state.get("cfg_destino",""),   placeholder="destinatario@email.com", key="cfg_destino_rod")
-    cfg_remetente_r = st.text_input("📤 Seu Gmail (remetente)", value=st.session_state.get("cfg_remetente",""), placeholder="seuemail@gmail.com",     key="cfg_remetente_rod")
-    cfg_senha_r     = st.text_input("🔑 Senha de app Gmail",    value=st.session_state.get("cfg_senha",""),     type="password", placeholder="Não é sua senha — gere em: Minha Conta Google → Segurança → Senhas de app", key="cfg_senha_rod")
-    st.caption("💡 Como gerar: myaccount.google.com → Segurança → Senhas de app")
-    if st.button("💾 Salvar configuração de email", use_container_width=True, key="salvar_cfg_rod"):
-        st.session_state["cfg_destino"]   = cfg_destino_r
-        st.session_state["cfg_remetente"] = cfg_remetente_r
-        st.session_state["cfg_senha"]     = cfg_senha_r
-        st.success("✅ Configuração salva com sucesso!")
+_em_servico = st.session_state.get("tipo_atendimento") in ("credito", "locacao")
 
-st.divider()
+if _em_servico:
+    # Dentro das páginas de serviço: só botão Sair
+    _cs1, _cs2 = st.columns([6, 0.9])
+    with _cs2:
+        if st.button("🚪 Sair", use_container_width=True, key="sair_rodape"):
+            for k in ["autenticado","cliente","cfg_destino","cfg_remetente","cfg_senha",
+                      "pdfs_gerados","email_gerado","processado","dados",
+                      "pdfs_gerados_loc","email_gerado_loc","processado_loc","dados_loc","tipo_atendimento"]:
+                st.session_state.pop(k, None)
+            st.query_params.clear()
+            st.rerun()
+else:
+    # Fora das páginas de serviço: os 3 botões
+    _ce, _ccfg, _csup, _clogout = st.columns([4, 1.2, 1.1, 0.9])
 
-if st.button("🚪 Sair da conta", use_container_width=True, key="sair_rodape"):
-    for k in ["autenticado","cliente","cfg_destino","cfg_remetente","cfg_senha",
-              "pdfs_gerados","email_gerado","processado","dados",
-              "pdfs_gerados_loc","email_gerado_loc","processado_loc","dados_loc","tipo_atendimento"]:
-        st.session_state.pop(k, None)
-    st.query_params.clear()
-    st.rerun()
+    with _ccfg:
+        with st.popover("⚙️ Email", use_container_width=True):
+            st.caption("**Configuração de envio de email**")
+            cfg_destino_r   = st.text_input("📧 Email destino",         value=st.session_state.get("cfg_destino",""),   placeholder="destinatario@email.com", key="cfg_destino_rod")
+            cfg_remetente_r = st.text_input("📤 Seu Gmail (remetente)", value=st.session_state.get("cfg_remetente",""), placeholder="seuemail@gmail.com",     key="cfg_remetente_rod")
+            cfg_senha_r     = st.text_input("🔑 Senha de app Gmail",    value=st.session_state.get("cfg_senha",""),     type="password", placeholder="Senha de app Google", key="cfg_senha_rod")
+            st.caption("💡 myaccount.google.com → Segurança → Senhas de app")
+            if st.button("💾 Salvar", use_container_width=True, key="salvar_cfg_rod"):
+                st.session_state["cfg_destino"]   = cfg_destino_r
+                st.session_state["cfg_remetente"] = cfg_remetente_r
+                st.session_state["cfg_senha"]     = cfg_senha_r
+                st.success("✅ Salvo!")
 
-# ── Diagnóstico (discreto — apenas para suporte) ──
-st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-with st.expander("🔧 Suporte técnico", expanded=False):
-    import sys, platform
-    from datetime import datetime as _dt
-    diag_linhas = []
-    diag_linhas.append("=" * 60)
-    diag_linhas.append("RELATÓRIO DE DIAGNÓSTICO — ImobFlow")
-    diag_linhas.append(f"Gerado em: {_dt.now().strftime('%d/%m/%Y %H:%M:%S')}")
-    diag_linhas.append("=" * 60)
-    diag_linhas.append("\n[ AMBIENTE ]")
-    diag_linhas.append(f"Python: {sys.version.split()[0]}")
-    diag_linhas.append(f"Plataforma: {platform.system()} {platform.release()}")
-    try:
-        import streamlit as _st2; diag_linhas.append(f"Streamlit: {_st2.__version__}")
-    except: pass
-    try:
-        import reportlab; diag_linhas.append(f"ReportLab: {reportlab.Version}")
-    except: diag_linhas.append("ReportLab: NÃO instalado")
-    try:
-        import img2pdf; diag_linhas.append("img2pdf: instalado")
-    except: diag_linhas.append("img2pdf: NÃO instalado")
-    diag_linhas.append("\n[ CLIENTE / SESSÃO ]")
-    _cli = st.session_state.get("cliente", {})
-    diag_linhas.append(f"Login: {_cli.get('login','?')} | Plano: {_cli.get('plano','free')} | Ativo: {_cli.get('ativo',False)}")
-    diag_linhas.append(f"Vencimento: {_cli.get('data_vencimento','?')} | Atendimento: {st.session_state.get('tipo_atendimento','?')}")
-    diag_linhas.append("\n[ CHAVES DE API ]")
-    try:
-        for i, k in enumerate(API_KEYS):
-            diag_linhas.append(f"  Chave {i+1}: {k[:8]}...{k[-4:]} ({len(k)} chars)")
-    except Exception as _e:
-        diag_linhas.append(f"Erro: {_e}")
-    diag_linhas.append("\n[ PROCESSAMENTO ]")
-    _pl = st.session_state.get("pdfs_polo_locador",   [])
-    _pt = st.session_state.get("pdfs_polo_locatario", [])
-    _pf = st.session_state.get("pdfs_polo_fiador",    [])
-    diag_linhas.append(f"Processado loc: {st.session_state.get('processado_loc',False)}")
-    diag_linhas.append(f"PDFs Locador ({len(_pl)}): {[n for n,_ in _pl]}")
-    diag_linhas.append(f"PDFs Locatário ({len(_pt)}): {[n for n,_ in _pt]}")
-    diag_linhas.append(f"PDFs Fiador ({len(_pf)}): {[n for n,_ in _pf]}")
-    diag_linhas.append("\n[ DADOS EXTRAÍDOS ]")
-    for _polo in ["dados_locador","dados_locatario","dados_fiador"]:
-        _d = st.session_state.get(_polo, {})
-        if _d:
-            diag_linhas.append(f"  {_polo.upper()}:")
-            for _k, _v in _d.items():
-                diag_linhas.append(f"    {_k}: {str(_v)[:80] if _v else '(vazio)'}")
-    diag_linhas.append("\n[ RETORNO BRUTO IA ]")
-    _tem = False
-    for _polo in ["locador","locatario","fiador"]:
-        _raw = st.session_state.get(f"debug_resp_{_polo}")
-        if _raw:
-            _tem = True
-            diag_linhas.append(f"--- {_polo.upper()} ---")
-            diag_linhas.append(_raw[:1200])
-    if not _tem:
-        diag_linhas.append("(nenhum — processe os documentos primeiro)")
-    diag_linhas.append("\n[ ERROS REGISTRADOS ]")
-    _erros = st.session_state.get("erros_sistema", [])
-    for _e in _erros: diag_linhas.append(f"  ⚠ {_e}")
-    if not _erros: diag_linhas.append("(nenhum erro registrado)")
-    diag_linhas.append("\n" + "=" * 60)
-    _relatorio = "\n".join(diag_linhas)
-    st.download_button(
-        "⬇️ Baixar relatório para suporte (.txt)",
-        data=_relatorio.encode("utf-8"),
-        file_name=f"diag_imobflow_{_dt.now().strftime('%Y%m%d_%H%M%S')}.txt",
-        mime="text/plain",
-        use_container_width=True,
-        key="dl_diag_rodape"
-    )
+    with _csup:
+        with st.popover("🔧 Suporte", use_container_width=True):
+            st.caption("**Diagnóstico técnico**")
+            st.caption("Baixe o relatório e envie ao suporte.")
+            import sys, platform
+            from datetime import datetime as _dt
+            diag_linhas = []
+            diag_linhas.append("=" * 60)
+            diag_linhas.append("RELATÓRIO DE DIAGNÓSTICO — ImobFlow")
+            diag_linhas.append(f"Gerado em: {_dt.now().strftime('%d/%m/%Y %H:%M:%S')}")
+            diag_linhas.append("=" * 60)
+            diag_linhas.append("\n[ AMBIENTE ]")
+            diag_linhas.append(f"Python: {sys.version.split()[0]}")
+            diag_linhas.append(f"Plataforma: {platform.system()} {platform.release()}")
+            try:
+                import streamlit as _st2; diag_linhas.append(f"Streamlit: {_st2.__version__}")
+            except: pass
+            try:
+                import reportlab; diag_linhas.append(f"ReportLab: {reportlab.Version}")
+            except: diag_linhas.append("ReportLab: NÃO instalado")
+            try:
+                import img2pdf; diag_linhas.append("img2pdf: instalado")
+            except: diag_linhas.append("img2pdf: NÃO instalado")
+            diag_linhas.append("\n[ CLIENTE / SESSÃO ]")
+            _cli = st.session_state.get("cliente", {})
+            diag_linhas.append(f"Login: {_cli.get('login','?')} | Plano: {_cli.get('plano','free')} | Ativo: {_cli.get('ativo',False)}")
+            diag_linhas.append(f"Vencimento: {_cli.get('data_vencimento','?')} | Atendimento: {st.session_state.get('tipo_atendimento','?')}")
+            diag_linhas.append("\n[ CHAVES DE API ]")
+            try:
+                for i, k in enumerate(API_KEYS):
+                    diag_linhas.append(f"  Chave {i+1}: {k[:8]}...{k[-4:]} ({len(k)} chars)")
+            except Exception as _ex:
+                diag_linhas.append(f"Erro: {_ex}")
+            diag_linhas.append("\n[ PROCESSAMENTO ]")
+            _pl = st.session_state.get("pdfs_polo_locador",   [])
+            _pt = st.session_state.get("pdfs_polo_locatario", [])
+            _pf = st.session_state.get("pdfs_polo_fiador",    [])
+            diag_linhas.append(f"Processado loc: {st.session_state.get('processado_loc',False)}")
+            diag_linhas.append(f"PDFs Locador ({len(_pl)}): {[n for n,_ in _pl]}")
+            diag_linhas.append(f"PDFs Locatário ({len(_pt)}): {[n for n,_ in _pt]}")
+            diag_linhas.append(f"PDFs Fiador ({len(_pf)}): {[n for n,_ in _pf]}")
+            diag_linhas.append("\n[ DADOS EXTRAÍDOS ]")
+            for _polo in ["dados_locador","dados_locatario","dados_fiador"]:
+                _d = st.session_state.get(_polo, {})
+                if _d:
+                    diag_linhas.append(f"  {_polo.upper()}:")
+                    for _k, _v in _d.items():
+                        diag_linhas.append(f"    {_k}: {str(_v)[:80] if _v else '(vazio)'}")
+            diag_linhas.append("\n[ RETORNO BRUTO IA ]")
+            _tem = False
+            for _polo in ["locador","locatario","fiador"]:
+                _raw = st.session_state.get(f"debug_resp_{_polo}")
+                if _raw:
+                    _tem = True
+                    diag_linhas.append(f"--- {_polo.upper()} ---")
+                    diag_linhas.append(_raw[:1200])
+            if not _tem:
+                diag_linhas.append("(nenhum — processe os documentos primeiro)")
+            diag_linhas.append("\n[ ERROS REGISTRADOS ]")
+            _erros = st.session_state.get("erros_sistema", [])
+            for _er in _erros: diag_linhas.append(f"  ⚠ {_er}")
+            if not _erros: diag_linhas.append("(nenhum erro registrado)")
+            diag_linhas.append("\n" + "=" * 60)
+            _relatorio = "\n".join(diag_linhas)
+            st.download_button(
+                "⬇️ Baixar relatório (.txt)",
+                data=_relatorio.encode("utf-8"),
+                file_name=f"diag_imobflow_{_dt.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                mime="text/plain",
+                use_container_width=True,
+                key="dl_diag_rodape"
+            )
+
+    with _clogout:
+        if st.button("🚪 Sair", use_container_width=True, key="sair_rodape"):
+            for k in ["autenticado","cliente","cfg_destino","cfg_remetente","cfg_senha",
+                      "pdfs_gerados","email_gerado","processado","dados",
+                      "pdfs_gerados_loc","email_gerado_loc","processado_loc","dados_loc","tipo_atendimento"]:
+                st.session_state.pop(k, None)
+            st.query_params.clear()
+            st.rerun()
 
 # ── Rodapé institucional ──
 st.markdown("""
