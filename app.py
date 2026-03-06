@@ -960,7 +960,7 @@ CAMPOS_LOCACAO = {
     "tipo_garantia", "nome_destinatario"
 }
 
-def gerar_contrato_pdf(dados_locador, dados_locatario, dados_fiador, imovel, clausula_dest):
+def gerar_contrato_pdf(dados_locador, dados_locatario, dados_fiador, imovel, clausula_dest, intermediacao=None):
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
@@ -1076,8 +1076,10 @@ def gerar_contrato_pdf(dados_locador, dados_locatario, dados_fiador, imovel, cla
                     "do LOCADOR, a locação prorrogar-se-á por prazo indeterminado, nas mesmas condições, "
                     "nos termos do Art. 47 da Lei nº 8.245/91.")
 
-    num_fianca = "11ª" if nome_fiad else ""
-    num_foro   = "12ª" if nome_fiad else "11ª"
+    tem_interm  = bool(intermediacao and intermediacao.get("nome"))
+    num_fianca  = "11ª" if nome_fiad else ""
+    num_interm  = ("12ª" if nome_fiad else "11ª") if tem_interm else ""
+    num_foro    = ("13ª" if nome_fiad else "12ª") if tem_interm else ("12ª" if nome_fiad else "11ª")
 
     story = []
 
@@ -1256,6 +1258,58 @@ def gerar_contrato_pdf(dados_locador, dados_locatario, dados_fiador, imovel, cla
               "Art. 39 da Lei nº 8.245/91."),
             p("<b>11.3</b> – O LOCADOR poderá exigir novo FIADOR nas hipóteses do Art. 40 da Lei nº 8.245/91. "
               "O LOCATÁRIO terá 30 dias para apresentar substituto idôneo."),
+            hr("#cccccc", 4),
+        ]
+
+    # ── CLÁUSULA INTERMEDIAÇÃO (condicional) ──
+    clausula_foro_num = num_foro
+    if tem_interm:
+        i = intermediacao
+        nome_i   = i.get("nome","")
+        tipo_i   = i.get("tipo","Corretor Autônomo")
+        creci_i  = i.get("creci_cnpj","")
+        cpf_i    = i.get("cpf_cnpj","")
+        tel_i    = i.get("telefone","")
+        email_i  = i.get("email","")
+        comis_i  = i.get("valor_comissao","1º aluguel integral")
+        adm_i    = i.get("taxa_adm","")
+        vig_i    = i.get("vigencia","Mesma vigência do contrato de locação")
+        aviso_i  = i.get("aviso_rescisao","30 dias")
+        servs_i  = i.get("servicos_adm",[])
+
+        qualif_i = f"{nome_i}"
+        if cpf_i:    qualif_i += f", inscrito(a) no CPF/CNPJ sob nº {cpf_i}"
+        if creci_i:  qualif_i += f", {creci_i}"
+        if tel_i:    qualif_i += f", Tel: {tel_i}"
+        if email_i:  qualif_i += f", e-mail: {email_i}"
+
+        story += [
+            p(f"CLÁUSULA {num_interm} — DA INTERMEDIAÇÃO IMOBILIÁRIA", h2_s),
+            p(f"<b>{num_interm[:2]}.1</b> – A presente locação foi intermediada por <b>{qualif_i}</b>, "
+              f"na qualidade de <b>{tipo_i}</b>, nos termos dos Arts. 722 e seguintes do Código Civil e "
+              f"da Lei nº 6.530/78 (Lei dos Corretores de Imóveis)."),
+            p(f"<b>{num_interm[:2]}.2 – Comissão de Locação:</b> Pela intermediação, o LOCADOR pagará ao "
+              f"intermediador a título de comissão: <b>{comis_i}</b>, devida na data da assinatura do "
+              f"presente contrato e da efetiva entrega das chaves ao LOCATÁRIO."),
+        ]
+        if adm_i:
+            servs_txt = ", ".join(servs_i) if servs_i else "conforme acordado entre as partes"
+            story += [
+                p(f"<b>{num_interm[:2]}.3 – Taxa de Administração:</b> O intermediador prestará serviços de "
+                  f"administração do imóvel mediante remuneração mensal de <b>{adm_i}</b>, descontada "
+                  f"do repasse ao LOCADOR. Serviços incluídos: {servs_txt}."),
+                p(f"<b>{num_interm[:2]}.4</b> – O intermediador compromete-se a repassar ao LOCADOR o valor "
+                  f"líquido do aluguel (deduzida a taxa de administração) até o dia <b>{int(dia_venc)+5 if str(dia_venc).isdigit() else 10}</b> "
+                  f"de cada mês, após o recebimento do locatário."),
+            ]
+        story += [
+            p(f"<b>{num_interm[:2]}.{'5' if adm_i else '3'} – Vigência do Mandato:</b> O presente mandato de "
+              f"intermediação/administração terá vigência de <b>{vig_i}</b>, podendo ser rescindido por "
+              f"qualquer das partes mediante aviso prévio de <b>{aviso_i}</b>, sem ônus para a parte que "
+              f"notificar, salvo inadimplência comprovada."),
+            p(f"<b>{num_interm[:2]}.{'6' if adm_i else '4'}</b> – O intermediador declara que possui habilitação "
+              f"legal para o exercício da atividade de corretagem/administração imobiliária, respondendo "
+              f"civil e profissionalmente pelos atos praticados no âmbito deste mandato."),
             hr("#cccccc", 4),
         ]
 
@@ -2337,6 +2391,116 @@ elif tipo_atendimento == "locacao":
   if finalidade_imovel and not area_val:
       st.warning("⚠️ Área do imóvel é obrigatória para gerar o contrato.")
 
+  # ── BLOCO 09 — Intermediação Imobiliária ──
+  st.markdown("""
+<div class='card-section' style='border-left-color:#6A1B9A;'>
+    <span class='step-number' style='background:#6A1B9A;'>09</span>
+    <p class='section-title'>🤝 Intermediação Imobiliária</p>
+    <p class='section-subtitle'>Dados do corretor ou imobiliária responsável — comissão, administração e vigência</p>
+</div>
+""", unsafe_allow_html=True)
+
+  tem_intermediacao = st.checkbox("Há intermediação imobiliária neste contrato?", key="tem_intermediacao", value=True)
+
+  interm_dados = {}
+  if tem_intermediacao:
+      st.markdown("<div style='background:#F9F0FF;border-radius:8px;padding:16px;margin-top:4px;'>", unsafe_allow_html=True)
+
+      col_ti1, col_ti2 = st.columns(2)
+      with col_ti1:
+          tipo_interm = st.selectbox("Tipo de intermediador", ["Corretor Autônomo","Imobiliária (Pessoa Jurídica)"], key="tipo_interm")
+      with col_ti2:
+          creci_interm = st.text_input("CRECI / CNPJ", placeholder="Ex: CRECI-PE 12345 ou 00.000.000/0001-00", key="creci_interm")
+
+      nome_interm = st.text_input("Nome completo / Razão social", placeholder="Ex: João Silva Corretor ou Imobiliária Central Ltda", key="nome_interm")
+
+      col_ti3, col_ti4 = st.columns(2)
+      with col_ti3:
+          cpf_cnpj_interm = st.text_input("CPF / CNPJ do intermediador", placeholder="000.000.000-00 ou 00.000.000/0001-00", key="cpf_cnpj_interm")
+      with col_ti4:
+          tel_interm = st.text_input("Telefone", placeholder="(81) 99999-0000", key="tel_interm")
+
+      st.markdown("---")
+      st.markdown("<div style='font-size:13px;font-weight:700;color:#6A1B9A;margin-bottom:8px;'>💰 Comissão de Locação (1º aluguel)</div>", unsafe_allow_html=True)
+
+      col_tc1, col_tc2 = st.columns(2)
+      with col_tc1:
+          modelo_comissao = st.selectbox("Modelo de comissão", [
+              "1º aluguel integral ao intermediador",
+              "50% ao intermediador / 50% ao proprietário",
+              "Percentual do 1º aluguel",
+              "Valor fixo combinado",
+          ], key="modelo_comissao")
+      with col_tc2:
+          if modelo_comissao == "Percentual do 1º aluguel":
+              pct_comissao = st.number_input("Percentual (%)", min_value=0.0, max_value=100.0, value=100.0, step=5.0, key="pct_comissao")
+              valor_comissao_str = f"{pct_comissao}% do 1º aluguel"
+          elif modelo_comissao == "Valor fixo combinado":
+              val_comissao = st.number_input("Valor fixo (R$)", min_value=0.0, step=50.0, key="val_comissao")
+              valor_comissao_str = f"R$ {val_comissao:,.2f}".replace(",","X").replace(".",",").replace("X",".")
+          elif modelo_comissao == "50% ao intermediador / 50% ao proprietário":
+              valor_comissao_str = "50% do 1º aluguel ao intermediador e 50% ao proprietário"
+              st.caption("50% intermediador / 50% proprietário")
+          else:
+              valor_comissao_str = "1º aluguel integral"
+              st.caption("100% do 1º aluguel ao intermediador")
+
+      st.markdown("---")
+      st.markdown("<div style='font-size:13px;font-weight:700;color:#6A1B9A;margin-bottom:8px;'>📋 Taxa de Administração (mensal)</div>", unsafe_allow_html=True)
+
+      tem_adm = st.checkbox("Há taxa de administração mensal?", key="tem_adm")
+      taxa_adm_str = ""
+      if tem_adm:
+          col_adm1, col_adm2 = st.columns(2)
+          with col_adm1:
+              pct_adm = st.number_input("Percentual de administração (%)", min_value=0.0, max_value=30.0, value=10.0, step=0.5, key="pct_adm")
+          with col_adm2:
+              base_adm = st.selectbox("Base de cálculo", ["Sobre o valor do aluguel","Sobre o valor total (aluguel + encargos)"], key="base_adm")
+          taxa_adm_str = f"{pct_adm}% ao mês — {base_adm.lower()}"
+          responsavel_adm = st.text_input("Responsável pela administração", value=st.session_state.get("nome_interm",""), key="responsavel_adm")
+          servicos_adm = st.multiselect("Serviços incluídos na administração", [
+              "Cobrança de aluguel","Repasse ao proprietário","Gestão de inadimplência",
+              "Vistoria periódica","Renovação contratual","Atendimento ao locatário",
+          ], default=["Cobrança de aluguel","Repasse ao proprietário"], key="servicos_adm")
+
+      st.markdown("---")
+      st.markdown("<div style='font-size:13px;font-weight:700;color:#6A1B9A;margin-bottom:8px;'>📅 Vigência da Intermediação</div>", unsafe_allow_html=True)
+
+      col_vig1, col_vig2 = st.columns(2)
+      with col_vig1:
+          vigencia_interm = st.selectbox("Vigência do mandato de administração", [
+              "Mesma vigência do contrato de locação",
+              "12 meses renovável",
+              "24 meses renovável",
+              "Indeterminada",
+          ], key="vigencia_interm")
+      with col_vig2:
+          aviso_interm = st.selectbox("Aviso prévio para rescisão da intermediação", [
+              "30 dias","60 dias","90 dias"
+          ], key="aviso_interm")
+
+      email_interm = st.text_input("E-mail do intermediador", placeholder="corretor@email.com", key="email_interm")
+
+      st.markdown("</div>", unsafe_allow_html=True)
+
+      interm_dados = {
+          "tipo":            tipo_interm,
+          "nome":            nome_interm,
+          "creci_cnpj":      creci_interm,
+          "cpf_cnpj":        cpf_cnpj_interm,
+          "telefone":        tel_interm,
+          "email":           email_interm,
+          "modelo_comissao": modelo_comissao,
+          "valor_comissao":  valor_comissao_str,
+          "tem_adm":         tem_adm,
+          "taxa_adm":        taxa_adm_str,
+          "servicos_adm":    servicos_adm if tem_adm else [],
+          "vigencia":        vigencia_interm,
+          "aviso_rescisao":  aviso_interm,
+      }
+
+  imovel_dados["intermediacao"] = interm_dados
+
   st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
   processar_loc = st.button("⚡  ANALISAR DOCUMENTAÇÃO DO INQUILINO", type="primary", use_container_width=True, key="btn_processar_locacao")
 
@@ -2727,10 +2891,11 @@ elif tipo_atendimento == "locacao":
                 st.session_state["imovel_loc"]      = imovel_rev
 
                 with st.spinner("⚙️ Gerando contrato..."):
-                    clausula_r = st.session_state.get("clausula_loc", "")
+                    clausula_r    = st.session_state.get("clausula_loc", "")
+                    interm_r      = imovel_rev.get("intermediacao", st.session_state.get("imovel_loc",{}).get("intermediacao",{}))
                     contrato_bytes = gerar_contrato_pdf(
                         dados_loc_rev, dados_locat_rev, dados_fiad_rev,
-                        imovel_rev, clausula_r
+                        imovel_rev, clausula_r, intermediacao=interm_r
                     )
                     st.session_state["contrato_gerado"] = contrato_bytes
                 st.success("✅ Contrato gerado com os dados revisados!")
