@@ -2328,21 +2328,25 @@ elif tipo_atendimento == "locacao":
       })
 
   # — Seção de Fotos / Vistoria —
-  st.markdown("""
-<div class='card-section' style='border-left-color:#2E7D32;margin-top:12px;'>
-    <span class='step-number' style='background:#2E7D32;'>07</span>
-    <p class='section-title'>Fotos e vistoria (opcional)</p>
-    <p class='section-subtitle'>Anexe fotos do imóvel — a IA descreve o estado de conservação com linguagem neutra</p>
-</div>
-""", unsafe_allow_html=True)
-  fotos_upload = st.file_uploader(
-      "Selecione as fotos do imóvel",
-      accept_multiple_files=True,
-      type=["jpg","jpeg","png","webp","bmp"],
-      key="fotos_imovel"
-  )
-  if fotos_upload:
-      st.caption(f"📷 {len(fotos_upload)} foto(s) selecionada(s) — o Termo de Vistoria será gerado automaticamente")
+  with st.container(border=True):
+      st.markdown("""
+      <div style='display:flex;align-items:center;gap:10px;margin-bottom:4px;'>
+          <span style='background:#2E7D32;color:white;font-size:12px;font-weight:700;
+              padding:3px 10px;border-radius:20px;'>07</span>
+          <span style='font-size:15px;font-weight:700;color:#1A1A2E;'>📷 Fotos e vistoria <span style='font-weight:400;color:#5C6B7A;font-size:13px;'>(opcional)</span></span>
+      </div>
+      <div style='font-size:12px;color:#5C6B7A;margin-bottom:8px;'>
+          Anexe fotos do imóvel — a IA descreve o estado de conservação com linguagem neutra
+      </div>
+      """, unsafe_allow_html=True)
+      fotos_upload = st.file_uploader(
+          "Arraste ou clique para selecionar as fotos do imóvel",
+          accept_multiple_files=True,
+          type=["jpg","jpeg","png","webp","bmp"],
+          key="fotos_imovel"
+      )
+      if fotos_upload:
+          st.caption(f"📷 {len(fotos_upload)} foto(s) selecionada(s) — o Termo de Vistoria será gerado automaticamente")
 
   imovel_dados["fotos"] = len(fotos_upload) if fotos_upload else 0
 
