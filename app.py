@@ -80,6 +80,207 @@ def registrar_uso(cliente, qtd_arquivos=0, email_enviado=False):
                   json={"cliente_id":cliente["id"],"cliente_nome":cliente["nome"],
                         "cliente_login":cliente["login"],"qtd_arquivos":qtd_arquivos,"email_enviado":email_enviado})
 
+# ══════════════════════════════════════════════════════
+# HISTÓRICO DE ATENDIMENTOS
+# ══════════════════════════════════════════════════════
+def registrar_historico(cliente, tipo, nome_locatario="", nome_locador="", score=None, status="Finalizado"):
+    """Salva atendimento no Supabase tabela historico_atendimentos."""
+    from datetime import datetime as _dt
+    try:
+        payload = {
+            "cliente_id":    cliente.get("id"),
+            "cliente_login": cliente.get("login"),
+            "tipo":          tipo,
+            "nome_locatario": nome_locatario[:120] if nome_locatario else "",
+            "nome_locador":   nome_locador[:120]   if nome_locador   else "",
+            "score_risco":    score,
+            "status":         status,
+            "criado_em":      _dt.now().isoformat(),
+        }
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/historico_atendimentos",
+            headers={**SB_HEADERS, "Content-Type": "application/json", "Prefer": "return=minimal"},
+            json=payload, timeout=8
+        )
+    except Exception as e:
+        _log_erro("registrar_historico", e)
+
+def buscar_historico(cliente_id, limite=20):
+    """Retorna últimos atendimentos do cliente."""
+    try:
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/historico_atendimentos"
+            f"?cliente_id=eq.{cliente_id}&order=criado_em.desc&limit={limite}&select=*",
+            headers=SB_HEADERS, timeout=8
+        )
+        return r.json() if r.ok else []
+    except:
+        return []
+
+# ══════════════════════════════════════════════════════
+# SCORE DE RISCO (Plano Pro)
+# ══════════════════════════════════════════════════════
+def calcular_score_risco(dados_locatario, dados_fiador=None, imovel=None):
+    """IA avalia risco de inadimplência com base nos dados extraídos."""
+    renda_str    = str(dados_locatario.get("renda_valor", "0")).replace("R$","").replace(".","").replace(",",".").strip()
+    aluguel_str  = str(imovel.get("valor_aluguel", "0") if imovel else "0").replace("R$","").replace(".","").replace(",",".").strip()
+    try:    renda   = float(renda_str)   if renda_str   else 0
+    except: renda   = 0
+    try:    aluguel = float(aluguel_str) if aluguel_str else 0
+    except: aluguel = 0
+
+    prompt = f"""Você é um especialista em análise de crédito imobiliário brasileiro.
+Avalie o risco de inadimplência do locatário com base nos dados abaixo.
+
+DADOS DO LOCATÁRIO:
+- Nome: {dados_locatario.get("nome_completo","?")}
+- Profissão: {dados_locatario.get("profissao","?")}
+- Renda declarada: R$ {renda:.2f}
+- Tipo de renda: {dados_locatario.get("renda_tipo","?")}
+- Estado civil: {dados_locatario.get("estado_civil","?")}
+- Tipo de garantia: {dados_locatario.get("tipo_garantia","Fiador")}
+
+DADOS DO IMÓVEL:
+- Valor do aluguel: R$ {aluguel:.2f}
+- Comprometimento de renda: {f"{(aluguel/renda*100):.1f}%" if renda > 0 else "não calculável"}
+
+FIADOR: {"Sim — " + dados_fiador.get("nome_completo","?") + ", " + dados_fiador.get("profissao","?") if dados_fiador and dados_fiador.get("nome_completo") else "Não há fiador"}
+
+Retorne APENAS JSON válido, sem markdown:
+{{
+  "nivel": "BAIXO" ou "MÉDIO" ou "ALTO",
+  "score": número de 0 a 100 (0=altíssimo risco, 100=sem risco),
+  "comprometimento_renda": "X%",
+  "pontos_positivos": ["item1","item2"],
+  "pontos_atencao": ["item1","item2"],
+  "recomendacao": "texto curto de recomendação"
+}}"""
+
+    try:
+        resp = chamar_gemini([{"text": prompt}])
+        import json as _json
+        clean = resp.strip().replace("```json","").replace("```","").strip()
+        return _json.loads(clean)
+    except Exception as e:
+        _log_erro("calcular_score_risco", e)
+        return None
+
+# ══════════════════════════════════════════════════════
+# DOSSIÊ PDF COMPLETO
+# ══════════════════════════════════════════════════════
+def gerar_dossie_pdf(dados_locador, dados_locatario, dados_fiador, imovel,
+                     contrato_bytes=None, termo_bytes=None,
+                     email_texto="", score=None):
+    """Gera PDF dossiê consolidando todos os dados do atendimento."""
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, PageBreak
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    import io as _io
+
+    buf = _io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=2.5*cm, rightMargin=2.5*cm,
+                            topMargin=2.5*cm, bottomMargin=2.5*cm)
+
+    styles = getSampleStyleSheet()
+    title_s = ParagraphStyle("title_d", parent=styles["Heading1"],
+                             fontSize=18, textColor=colors.HexColor("#1A3A6B"),
+                             spaceAfter=6, fontName="Helvetica-Bold")
+    h2_s    = ParagraphStyle("h2_d", parent=styles["Heading2"],
+                             fontSize=13, textColor=colors.HexColor("#1565C0"),
+                             spaceBefore=14, spaceAfter=4, fontName="Helvetica-Bold")
+    body_s  = ParagraphStyle("body_d", parent=styles["Normal"],
+                             fontSize=10, leading=15, spaceAfter=3)
+    label_s = ParagraphStyle("label_d", parent=styles["Normal"],
+                             fontSize=9, textColor=colors.HexColor("#5C6B7A"),
+                             spaceAfter=1)
+    ok_s    = ParagraphStyle("ok_d", parent=styles["Normal"],
+                             fontSize=10, textColor=colors.HexColor("#2E7D32"), spaceAfter=3)
+    warn_s  = ParagraphStyle("warn_d", parent=styles["Normal"],
+                             fontSize=10, textColor=colors.HexColor("#E65100"), spaceAfter=3)
+
+    def hr(): return HRFlowable(width="100%", thickness=0.5,
+                                color=colors.HexColor("#BBCFEE"), spaceAfter=8)
+    def sp(h=0.3): return Spacer(1, h*cm)
+    def p(txt, st=body_s): return Paragraph(txt, st)
+
+    def bloco_pessoa(titulo, dados):
+        items = [p(f"<b>{titulo}</b>", h2_s), hr()]
+        campos = [
+            ("Nome completo",   dados.get("nome_completo","")),
+            ("CPF",             dados.get("cpf","")),
+            ("RG",              dados.get("rg","")),
+            ("Órgão expedidor", dados.get("orgao_expedidor","")),
+            ("Estado civil",    dados.get("estado_civil","")),
+            ("Profissão",       dados.get("profissao","")),
+            ("Renda",           dados.get("renda_valor","")),
+            ("Endereço",        dados.get("endereco","")),
+            ("Telefone",        dados.get("telefone","")),
+            ("E-mail",          dados.get("email","")),
+        ]
+        for label, valor in campos:
+            if valor:
+                items.append(p(f"<font color='#5C6B7A' size='8'>{label}</font>"))
+                items.append(p(str(valor)))
+                items.append(sp(0.1))
+        return items
+
+    from datetime import datetime as _dt
+    story = []
+
+    # ── CAPA ──
+    story += [
+        sp(1.5),
+        p("<b>DOSSIÊ DO CLIENTE</b>", title_s),
+        p(f"Gerado em {_dt.now().strftime('%d/%m/%Y às %H:%M')}", label_s),
+        p(f"Imóvel: {imovel.get('endereco_completo', imovel.get('logradouro',''))} — {imovel.get('cidade','')}"),
+        p(f"Aluguel: R$ {imovel.get('valor_aluguel','')} | Duração: {imovel.get('duracao_contrato','')}"),
+        sp(0.5), hr(), sp(0.5),
+    ]
+
+    # ── DADOS PESSOAIS ──
+    story += bloco_pessoa("🏠 LOCADOR — Proprietário", dados_locador)
+    story += [sp(0.3)]
+    story += bloco_pessoa("🔑 LOCATÁRIO — Inquilino", dados_locatario)
+    if dados_fiador and dados_fiador.get("nome_completo"):
+        story += [sp(0.3)]
+        story += bloco_pessoa("🤝 FIADOR — Garantidor", dados_fiador)
+
+    # ── SCORE DE RISCO ──
+    if score:
+        story += [PageBreak(), p("<b>📊 ANÁLISE DE RISCO DO LOCATÁRIO</b>", h2_s), hr()]
+        cor_nivel = {"BAIXO": "#2E7D32", "MÉDIO": "#E65100", "ALTO": "#C62828"}.get(score.get("nivel",""), "#555")
+        story += [
+            p(f"<b>Nível de risco: <font color='{cor_nivel}'>{score.get('nivel','?')}</font></b> &nbsp;|&nbsp; Score: <b>{score.get('score','?')}/100</b>"),
+            p(f"Comprometimento de renda: {score.get('comprometimento_renda','?')}"),
+            sp(0.2),
+        ]
+        if score.get("pontos_positivos"):
+            story.append(p("<b>✅ Pontos positivos:</b>"))
+            for pt in score["pontos_positivos"]:
+                story.append(p(f"  • {pt}", ok_s))
+        if score.get("pontos_atencao"):
+            story.append(p("<b>⚠️ Pontos de atenção:</b>"))
+            for pt in score["pontos_atencao"]:
+                story.append(p(f"  • {pt}", warn_s))
+        story.append(sp(0.2))
+        story.append(p(f"<b>Recomendação:</b> {score.get('recomendacao','')}"))
+
+    # ── EMAIL GERADO ──
+    if email_texto:
+        story += [PageBreak(), p("<b>✉️ EMAIL GERADO PELA IA</b>", h2_s), hr()]
+        for linha in email_texto.split("\n")[:60]:
+            story.append(p(linha.strip() or " "))
+
+    story.append(sp(1))
+    story.append(p("Documento gerado pela plataforma ImobFlow. Uso interno.", label_s))
+
+    doc.build(story)
+    buf.seek(0)
+    return buf.read()
+
 def criar_token(cliente_id):
     token  = secrets.token_urlsafe(32)
     expira = (datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat()
@@ -1846,6 +2047,45 @@ if "tipo_atendimento" not in st.session_state:
             st.rerun()
         st.markdown("<div style='text-align:center;font-size:12px;color:#5C6B7A;margin-top:6px;'>Aluguel · Análise de Inquilino</div>", unsafe_allow_html=True)
 
+    # ── Histórico de Atendimentos ──
+    _cli_hist = st.session_state.get("cliente", {})
+    if _cli_hist.get("id"):
+        st.divider()
+        with st.expander("📋 Histórico de Atendimentos", expanded=False):
+            _hist = buscar_historico(_cli_hist["id"], limite=20)
+            if _hist:
+                _cores_tipo = {"Locação":"#2E7D32","Crédito Imobiliário":"#1565C0"}
+                _cores_score = {"BAIXO":"#2E7D32","MÉDIO":"#E65100","ALTO":"#C62828"}
+                for _h in _hist:
+                    _tipo_h   = _h.get("tipo","?")
+                    _cor_h    = _cores_tipo.get(_tipo_h,"#555")
+                    _nome_h   = _h.get("nome_locatario") or _h.get("nome_locador","—")
+                    _data_h   = _h.get("criado_em","")[:10]
+                    _status_h = _h.get("status","?")
+                    _score_h  = _h.get("score_risco")
+                    _score_txt = ""
+                    if _score_h is not None:
+                        _nivel_h = "BAIXO" if _score_h >= 70 else ("MÉDIO" if _score_h >= 40 else "ALTO")
+                        _cor_sh  = _cores_score[_nivel_h]
+                        _score_txt = (
+                            f" &nbsp;·&nbsp; <span style='color:{_cor_sh};"
+                            f"font-weight:700;'>Score {_score_h}/100</span>"
+                        )
+                    st.markdown(
+                        f"<div style='border-left:3px solid {_cor_h};"
+                        f"padding:8px 12px;margin-bottom:6px;border-radius:0 6px 6px 0;"
+                        f"background:#FAFAFA;'>"
+                        f"<span style='font-size:12px;font-weight:700;color:{_cor_h};'>"
+                        f"{_tipo_h}</span>"
+                        f"<span style='font-size:12px;color:#1A1A2E;'> · {_nome_h}</span>"
+                        f"<span style='font-size:11px;color:#5C6B7A;'> · {_data_h}</span>"
+                        f"{_score_txt}"
+                        f"<span style='float:right;font-size:10px;color:#888;'>{_status_h}</span>"
+                        f"</div>",
+                        unsafe_allow_html=True)
+            else:
+                st.caption("Nenhum atendimento registrado ainda.")
+
     st.stop()
 
 tipo_atendimento = st.session_state.get("tipo_atendimento", "credito")
@@ -2698,10 +2938,29 @@ elif tipo_atendimento == "locacao":
         st.session_state["termo_vistoria_loc"]  = termo_vistoria_bytes
         st.session_state["fotos_nomes_loc"]     = fotos_nomes
         st.session_state["processado_loc"]      = True
+
+        # ── Score de risco (calcula em background, salva no session_state) ──
         cliente_sess = st.session_state.get("cliente")
+        is_pro_score = cliente_sess.get("plano","free") in ("mensal","semestral","anual") if cliente_sess else False
+        if is_pro_score:
+            with st.spinner("📊 Calculando score de risco..."):
+                _score = calcular_score_risco(dados_locatario_ext, dados_fiador_ext if bytes_fiador else None, imovel_dados)
+                st.session_state["score_risco_loc"] = _score
+        else:
+            st.session_state["score_risco_loc"] = None
+
+        # ── Registrar no histórico ──
         if cliente_sess:
             total_arqs = len(bytes_locador) + len(bytes_locatario) + len(bytes_fiador)
             registrar_uso(cliente_sess, qtd_arquivos=total_arqs)
+            registrar_historico(
+                cliente_sess,
+                tipo="Locação",
+                nome_locatario=dados_locatario_ext.get("nome_completo",""),
+                nome_locador=dados_locador_ext.get("nome_completo",""),
+                score=st.session_state.get("score_risco_loc",{}).get("score") if st.session_state.get("score_risco_loc") else None,
+                status="Finalizado"
+            )
 
   if st.session_state.get("processado_loc"):
     pdfs_loc         = st.session_state["pdfs_gerados_loc"]
@@ -2711,6 +2970,60 @@ elif tipo_atendimento == "locacao":
     clausula_loc     = st.session_state.get("clausula_loc", "")
     termo_vis_bytes  = st.session_state.get("termo_vistoria_loc")
     fotos_nomes_loc  = st.session_state.get("fotos_nomes_loc", [])
+
+    st.divider()
+
+    # ── Score de Risco (Plano Pro) ──
+    _score_loc     = st.session_state.get("score_risco_loc")
+    _cliente_score = st.session_state.get("cliente", {})
+    _is_pro_score  = _cliente_score.get("plano","free") in ("mensal","semestral","anual")
+
+    if _is_pro_score:
+        if _score_loc:
+            _nivel = _score_loc.get("nivel","")
+            _cor   = {"BAIXO":"#2E7D32","MÉDIO":"#E65100","ALTO":"#C62828"}.get(_nivel,"#555")
+            _bg    = {"BAIXO":"#E8F5E9","MÉDIO":"#FFF3E0","ALTO":"#FFEBEE"}.get(_nivel,"#F5F5F5")
+            _icon  = {"BAIXO":"✅","MÉDIO":"⚠️","ALTO":"🔴"}.get(_nivel,"📊")
+            _sc    = _score_loc.get("score","?")
+            _comp  = _score_loc.get("comprometimento_renda","?")
+            st.markdown(
+                f"<div style='background:{_bg};border:1px solid {_cor};border-radius:10px;"
+                f"padding:14px 18px;margin-bottom:8px;'>"
+                f"<div style='font-size:13px;font-weight:700;color:#1A1A2E;margin-bottom:6px;'>"
+                f"📊 Score de Risco do Locatário &nbsp;"
+                f"<span style='background:#1565C0;color:white;font-size:10px;"
+                f"padding:2px 8px;border-radius:10px;'>PRO</span></div>"
+                f"<div style='font-size:22px;font-weight:800;color:{_cor};'>"
+                f"{_icon} {_nivel} &nbsp;"
+                f"<span style='font-size:14px;font-weight:600;color:#555;'>Score {_sc}/100</span></div>"
+                f"<div style='font-size:12px;color:#5C6B7A;margin-top:4px;'>"
+                f"Comprometimento de renda: <b>{_comp}</b></div></div>",
+                unsafe_allow_html=True)
+            with st.expander("📋 Ver detalhes do score", expanded=False):
+                if _score_loc.get("pontos_positivos"):
+                    st.markdown("**✅ Pontos positivos:**")
+                    for _pt in _score_loc["pontos_positivos"]:
+                        st.markdown(f"<span style='color:#2E7D32;'>• {_pt}</span>", unsafe_allow_html=True)
+                if _score_loc.get("pontos_atencao"):
+                    st.markdown("**⚠️ Pontos de atenção:**")
+                    for _pt in _score_loc["pontos_atencao"]:
+                        st.markdown(f"<span style='color:#E65100;'>• {_pt}</span>", unsafe_allow_html=True)
+                if _score_loc.get("recomendacao"):
+                    st.markdown(f"**💡 Recomendação:** {_score_loc['recomendacao']}")
+        else:
+            st.info("📊 Score de risco não disponível — reprocesse para calcular.")
+    else:
+        st.markdown(
+            "<div style='background:#EEF4FF;border:1px solid #BBCFEE;border-radius:10px;"
+            "padding:12px 16px;margin-bottom:8px;'>"
+            "<span style='font-size:13px;font-weight:700;color:#1A3A6B;'>"
+            "📊 Score de Risco do Locatário &nbsp;"
+            "<span style='background:#1565C0;color:white;font-size:10px;"
+            "padding:2px 8px;border-radius:10px;'>PRO</span></span><br>"
+            "<span style='font-size:12px;color:#4A6080;'>"
+            "Avaliação automática de inadimplência com base em renda, estabilidade e garantia — "
+            "disponível no plano Pro.</span></div>",
+            unsafe_allow_html=True)
 
     st.divider()
     checklist_loc = calcular_checklist_locacao([n for n,_ in pdfs_loc], dados_loc, imovel=imovel_loc)
@@ -3016,6 +3329,35 @@ elif tipo_atendimento == "locacao":
             key="dl_contrato"
         )
         st.success("✅ Contrato pronto! Revise antes de assinar.")
+
+        # ── Dossiê PDF ──
+        _d_loc   = st.session_state.get("dados_locador",   {})
+        _d_locat = st.session_state.get("dados_locatario", {})
+        _d_fiad  = st.session_state.get("dados_fiador",    {})
+        _imovel  = st.session_state.get("imovel_loc",      {})
+        _email_t = st.session_state.get("email_gerado_loc","")
+        _score_d = st.session_state.get("score_risco_loc")
+        _termo_d = st.session_state.get("termo_vistoria_loc")
+        if st.button("📁 Gerar Dossiê Completo do Cliente (PDF)", use_container_width=True, key="btn_dossie"):
+            with st.spinner("📁 Montando dossiê..."):
+                _dossie = gerar_dossie_pdf(
+                    _d_loc, _d_locat, _d_fiad, _imovel,
+                    contrato_bytes=st.session_state["contrato_gerado"],
+                    termo_bytes=_termo_d,
+                    email_texto=_email_t,
+                    score=_score_d
+                )
+                st.session_state["dossie_gerado"] = _dossie
+        if st.session_state.get("dossie_gerado"):
+            st.download_button(
+                "⬇️ Baixar Dossiê do Cliente (PDF)",
+                data=st.session_state["dossie_gerado"],
+                file_name=f"Dossie_{_d_locat.get('nome_completo','Cliente').split()[0]}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                key="dl_dossie"
+            )
+
         if st.button("✏️ Editar dados novamente", use_container_width=True, key="btn_reeditar"):
             st.session_state["revisao_aberta"] = True
             st.session_state["contrato_gerado"] = None
