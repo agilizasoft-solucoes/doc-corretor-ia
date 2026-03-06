@@ -2133,6 +2133,70 @@ if "tipo_atendimento" not in st.session_state:
             else:
                 st.caption("Nenhum atendimento registrado ainda — processe o primeiro para começar.")
 
+    # ── Barra de conta (tela inicial) ──
+    st.divider()
+    _bi_e, _bi_cfg, _bi_sup, _bi_out = st.columns([4, 1.2, 1.1, 0.9])
+
+    with _bi_cfg:
+        with st.popover("⚙️ Email", use_container_width=True):
+            st.caption("**Configuração de envio de email**")
+            _cfg_d = st.text_input("📧 Email destino",         value=st.session_state.get("cfg_destino",""),   placeholder="destinatario@email.com", key="cfg_d_home")
+            _cfg_r = st.text_input("📤 Seu Gmail (remetente)", value=st.session_state.get("cfg_remetente",""), placeholder="seuemail@gmail.com",     key="cfg_r_home")
+            _cfg_s = st.text_input("🔑 Senha de app Gmail",    value=st.session_state.get("cfg_senha",""),     type="password", placeholder="Senha de app Google", key="cfg_s_home")
+            st.caption("💡 myaccount.google.com → Segurança → Senhas de app")
+            if st.button("💾 Salvar", use_container_width=True, key="salvar_cfg_home"):
+                st.session_state["cfg_destino"]   = _cfg_d
+                st.session_state["cfg_remetente"] = _cfg_r
+                st.session_state["cfg_senha"]     = _cfg_s
+                st.success("✅ Salvo!")
+
+    with _bi_sup:
+        with st.popover("🔧 Suporte", use_container_width=True):
+            st.caption("**Diagnóstico técnico**")
+            st.caption("Baixe o relatório e envie ao suporte.")
+            import sys, platform
+            from datetime import datetime as _dth
+            _diag = [
+                "=" * 60,
+                "RELATÓRIO DE DIAGNÓSTICO — ImobFlow",
+                f"Gerado em: {_dth.now().strftime('%d/%m/%Y %H:%M:%S')}",
+                "=" * 60,
+                "\n[ AMBIENTE ]",
+                f"Python: {sys.version.split()[0]}",
+                f"Plataforma: {platform.system()} {platform.release()}",
+            ]
+            try:
+                import streamlit as _st2; _diag.append(f"Streamlit: {_st2.__version__}")
+            except: pass
+            _cli_d = st.session_state.get("cliente", {})
+            _diag += [
+                "\n[ CLIENTE ]",
+                f"Login: {_cli_d.get('login','?')} | Plano: {_cli_d.get('plano','free')}",
+                f"Vencimento: {_cli_d.get('data_vencimento','?')}",
+                "\n[ ERROS ]",
+            ]
+            _errs = st.session_state.get("erros_sistema", [])
+            for _er in _errs: _diag.append(f"  ⚠ {_er}")
+            if not _errs: _diag.append("(nenhum)")
+            _diag.append("\n" + "=" * 60)
+            st.download_button(
+                "⬇️ Baixar relatório (.txt)",
+                data="\n".join(_diag).encode("utf-8"),
+                file_name=f"diag_imobflow_{_dth.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                mime="text/plain",
+                use_container_width=True,
+                key="dl_diag_home"
+            )
+
+    with _bi_out:
+        if st.button("🚪 Sair", use_container_width=True, key="sair_home"):
+            for _k in ["autenticado","cliente","cfg_destino","cfg_remetente","cfg_senha",
+                       "pdfs_gerados","email_gerado","processado","dados",
+                       "pdfs_gerados_loc","email_gerado_loc","processado_loc","dados_loc","tipo_atendimento"]:
+                st.session_state.pop(_k, None)
+            st.query_params.clear()
+            st.rerun()
+
     st.stop()
 
 tipo_atendimento = st.session_state.get("tipo_atendimento", "credito")
