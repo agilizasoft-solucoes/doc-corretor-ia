@@ -372,10 +372,58 @@ def check_login():
         st.stop()
 
     if not st.session_state.get("autenticado", False):
-        st.markdown("<style>section[data-testid='stMain'] > div{max-width:480px;margin:40px auto;}</style>", unsafe_allow_html=True)
-        exibir_logo(altura=380, largura_max=460)
-        st.caption("<div style='text-align:center'>Sistema de organização de documentos para financiamento</div>", unsafe_allow_html=True)
-        st.divider()
+        st.markdown("""
+        <style>
+        section[data-testid='stMain'] > div {
+            max-width: 420px;
+            margin: 18px auto 0 auto;
+            padding-top: 0 !important;
+        }
+        /* Remove espaço interno do Streamlit acima do primeiro elemento */
+        section[data-testid='stMain'] > div > div:first-child {
+            padding-top: 0 !important;
+        }
+        .bloco-logo {
+            text-align: center;
+            padding: 28px 0 12px 0;
+            background: white;
+            border-radius: 14px 14px 0 0;
+        }
+        .bloco-logo img {
+            width: 280px;
+            max-width: 90%;
+            height: auto;
+        }
+        .bloco-tagline {
+            text-align: center;
+            font-size: 0.78rem;
+            color: #888;
+            padding: 0 0 18px 0;
+            background: white;
+        }
+        .bloco-form {
+            background: white;
+            border-radius: 0 0 14px 14px;
+            padding: 0 0 8px 0;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # Logo + tagline num bloco visual único
+        img_b64 = LOGO_BASE64
+        try:
+            import os, base64
+            if os.path.exists("logo_imobflow.png"):
+                with open("logo_imobflow.png", "rb") as _f:
+                    img_b64 = base64.b64encode(_f.read()).decode()
+        except: pass
+        st.markdown(f"""
+        <div class="bloco-logo">
+            <img src="data:image/png;base64,{img_b64}">
+        </div>
+        <div class="bloco-tagline">Sistema de organização de documentos para financiamento</div>
+        <hr style="margin:0 0 14px 0;border:none;border-top:1px solid #EEE;">
+        """, unsafe_allow_html=True)
         tela = st.radio("", ["🔑 Entrar","🔓 Esqueci minha senha"], horizontal=True, label_visibility="collapsed")
         if tela == "🔑 Entrar":
             login = st.text_input("👤 Login")
