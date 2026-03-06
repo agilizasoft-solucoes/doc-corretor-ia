@@ -2199,24 +2199,7 @@ elif tipo_atendimento == "locacao":
               else:
                   st.caption(f"📎 {len(upload_fiador)} arquivo(s) do fiador selecionado(s)")
 
-  # ── BLOCO 04 — Informações adicionais ──
-  step_info = "04" if not tem_fiador else "04"
-  st.markdown(f"""
-<div class='card-section' style='border-left-color:#2E7D32;'>
-    <span class='step-number' style='background:#2E7D32;'>{step_info}</span>
-    <p class='section-title'>Informações adicionais</p>
-    <p class='section-subtitle'>Cole mensagens do WhatsApp, anotações ou dados extras de qualquer parte</p>
-</div>
-""", unsafe_allow_html=True)
-  texto_loc = st.text_area(
-      "",
-      height=100,
-      placeholder="Ex:\nRenda informal R$3.200 | Garantia: seguro fiança\nTel: 81 9 9999-0000 | email@gmail.com\nFiador: José da Silva...",
-      label_visibility="collapsed",
-      key="texto_locacao"
-  )
-
-  # ── BLOCO 05 — Destinatário ──
+  # ── BLOCO 04 — Destinatário ──
   st.markdown("""
 <div class='card-section' style='border-left-color:#2E7D32;'>
     <span class='step-number' style='background:#2E7D32;'>05</span>
