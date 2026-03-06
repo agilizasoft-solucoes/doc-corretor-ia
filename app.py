@@ -1,6 +1,6 @@
 import streamlit as st
 
-st.set_page_config(page_title="ImobFlow", page_icon="📁", layout="wide")
+st.set_page_config(page_title="ImobFlow", page_icon="📁", layout="centered")
 import streamlit.components.v1 as components
 import base64
 import requests
@@ -1789,36 +1789,10 @@ st.markdown(f"""
 
 
 # Barra de ações — topo da página principal
-col_troca, col_sair = st.columns([3, 1])
-with col_troca:
-    if st.button("↩ Trocar tipo de atendimento", key="trocar_tipo", use_container_width=True):
-        for key in ["tipo_atendimento","pdfs_gerados","email_gerado","processado","dados"]:
-            st.session_state.pop(key, None)
-        st.rerun()
-with col_sair:
-    if st.button("🚪 Sair", key="sair_topo", use_container_width=True):
-        for k in ["autenticado","cliente","cfg_destino","cfg_remetente","cfg_senha",
-                  "pdfs_gerados","email_gerado","processado","dados",
-                  "pdfs_gerados_loc","email_gerado_loc","processado_loc","dados_loc","tipo_atendimento"]:
-            st.session_state.pop(k, None)
-        st.query_params.clear()
-        st.rerun()
-
-# ── Painel de configuração de email ──
-with st.expander("📤 Configurar envio de email (Gmail)", expanded=False):
-    st.caption("Configure uma vez e envie ao correspondente/imobiliária com 1 clique.")
-    col_e1, col_e2 = st.columns(2)
-    with col_e1:
-        cfg_destino_p   = st.text_input("📧 Email destino",  value=st.session_state.get("cfg_destino",""),   placeholder="destinatario@email.com", key="cfg_destino_pag")
-        cfg_remetente_p = st.text_input("📤 Seu Gmail",      value=st.session_state.get("cfg_remetente",""), placeholder="seuemail@gmail.com",      key="cfg_remetente_pag")
-    with col_e2:
-        cfg_senha_p     = st.text_input("🔑 Senha de app Gmail", value=st.session_state.get("cfg_senha",""), type="password", placeholder="Senha de app (não sua senha normal)", key="cfg_senha_pag")
-        st.caption("💡 Gere em: myaccount.google.com → Segurança → Senhas de app")
-    if st.button("💾 Salvar configuração de email", use_container_width=True, key="salvar_cfg_pag"):
-        st.session_state["cfg_destino"]   = cfg_destino_p
-        st.session_state["cfg_remetente"] = cfg_remetente_p
-        st.session_state["cfg_senha"]     = cfg_senha_p
-        st.success("✅ Configuração salva!")
+if st.button("↩ Trocar tipo de atendimento", key="trocar_tipo", use_container_width=True):
+    for key in ["tipo_atendimento","pdfs_gerados","email_gerado","processado","dados"]:
+        st.session_state.pop(key, None)
+    st.rerun()
 
 st.divider()
 
@@ -2796,6 +2770,41 @@ elif tipo_atendimento == "locacao":
         for key in ["pdfs_gerados_loc","email_gerado_loc","processado_loc","dados_loc","tipo_atendimento"]:
             if key in st.session_state: del st.session_state[key]
         st.rerun()
+
+# ── Painel de configuração + Sair ──
+st.divider()
+st.markdown("""
+<div style='background:#ffffff;border-radius:12px;padding:22px 24px;
+     box-shadow:0 2px 10px rgba(0,0,0,0.06);margin-bottom:12px;'>
+    <div style='font-size:15px;font-weight:700;color:#1A1A2E;margin-bottom:4px;'>
+        📤 Configuração de envio de email
+    </div>
+    <div style='font-size:12px;color:#5C6B7A;'>
+        Configure uma vez e envie documentos ao correspondente com 1 clique
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+cfg_destino_r   = st.text_input("📧 Email destino",         value=st.session_state.get("cfg_destino",""),   placeholder="destinatario@email.com", key="cfg_destino_rod")
+cfg_remetente_r = st.text_input("📤 Seu Gmail (remetente)", value=st.session_state.get("cfg_remetente",""), placeholder="seuemail@gmail.com",     key="cfg_remetente_rod")
+cfg_senha_r     = st.text_input("🔑 Senha de app Gmail",    value=st.session_state.get("cfg_senha",""),     type="password", placeholder="Não é sua senha — gere em: Minha Conta Google → Segurança → Senhas de app", key="cfg_senha_rod")
+st.caption("💡 Como gerar: myaccount.google.com → Segurança → Senhas de app")
+
+if st.button("💾 Salvar configuração de email", use_container_width=True, key="salvar_cfg_rod"):
+    st.session_state["cfg_destino"]   = cfg_destino_r
+    st.session_state["cfg_remetente"] = cfg_remetente_r
+    st.session_state["cfg_senha"]     = cfg_senha_r
+    st.success("✅ Configuração salva com sucesso!")
+
+st.divider()
+
+if st.button("🚪 Sair da conta", use_container_width=True, key="sair_rodape"):
+    for k in ["autenticado","cliente","cfg_destino","cfg_remetente","cfg_senha",
+              "pdfs_gerados","email_gerado","processado","dados",
+              "pdfs_gerados_loc","email_gerado_loc","processado_loc","dados_loc","tipo_atendimento"]:
+        st.session_state.pop(k, None)
+    st.query_params.clear()
+    st.rerun()
 
 # ── Rodapé institucional ──
 st.markdown("""
