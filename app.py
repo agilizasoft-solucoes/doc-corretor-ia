@@ -2838,23 +2838,50 @@ elif tipo_atendimento == "locacao":
         key="zip_completo_loc"
     )
 
-    # ── Lista para envio por email ──
-    selecionados_loc = pdfs_polo_locador + pdfs_polo_locatario + (pdfs_polo_fiador if tem_fiador_ativo else [])
+    # ── Seleção de arquivos para envio ──
+    st.divider()
+    st.markdown(
+        "<div style='font-size:14px;font-weight:700;color:#1A1A2E;margin-bottom:4px;'>"
+        "📨 Selecione os arquivos para envio ao destinatário</div>"
+        "<div style='font-size:12px;color:#5C6B7A;margin-bottom:10px;'>"
+        "Marque ou desmarque o que deseja anexar no email</div>",
+        unsafe_allow_html=True
+    )
+
+    todos_pdfs_loc = (
+        [(n, c, "Locador")   for n,c in pdfs_polo_locador]   +
+        [(n, c, "Locatário") for n,c in pdfs_polo_locatario] +
+        ([(n, c, "Fiador")   for n,c in pdfs_polo_fiador] if tem_fiador_ativo else [])
+    )
+    selecionados_loc = []
+    for idx, (nome, conteudo, polo_label) in enumerate(todos_pdfs_loc):
+        cor_polo = {"Locador":"#1565C0","Locatário":"#2E7D32","Fiador":"#E65100"}.get(polo_label,"#555")
+        col_cb, col_tag = st.columns([0.82, 0.18])
+        with col_cb:
+            marcado = st.checkbox(f"📄 {nome}", value=True, key=f"sel_env_loc_{idx}")
+        with col_tag:
+            st.markdown(
+                f"<span style='background:{cor_polo};color:white;font-size:10px;"
+                f"font-weight:700;padding:2px 8px;border-radius:10px;'>{polo_label}</span>",
+                unsafe_allow_html=True)
+        if marcado:
+            selecionados_loc.append((nome, conteudo))
 
     # — Termo de Vistoria —
     if termo_vis_bytes:
-        st.divider()
-        st.markdown("""
-    <div class='card-section-neutral'>
-        <p class='section-title'>📋 Termo de Vistoria Inicial gerado</p>
-        <p class='section-subtitle'>Gerado com base nas fotos e dados informados — linguagem neutra e juridicamente segura</p>
-    </div>
-    """, unsafe_allow_html=True)
-        st.download_button("⬇️ Baixar Termo de Vistoria (PDF)", data=termo_vis_bytes,
-                           file_name="Termo_Vistoria_Inicial.pdf", mime="application/pdf",
-                           use_container_width=True, key="dl_vistoria")
+        col_vis_dl, col_vis_cb = st.columns([0.6, 0.4])
+        with col_vis_dl:
+            st.download_button("⬇️ Baixar Termo de Vistoria (PDF)", data=termo_vis_bytes,
+                               file_name="Termo_Vistoria_Inicial.pdf", mime="application/pdf",
+                               use_container_width=True, key="dl_vistoria")
+        with col_vis_cb:
+            incluir_vistoria_email = st.checkbox("📋 Incluir Termo de Vistoria no email", value=True, key="sel_vistoria_email")
         if fotos_nomes_loc:
-            st.caption(f"📷 Total de fotos anexadas: {len(fotos_nomes_loc)}")
+            st.caption(f"📷 Total de fotos: {len(fotos_nomes_loc)}")
+        if incluir_vistoria_email:
+            selecionados_loc.append(("Termo_Vistoria_Inicial.pdf", termo_vis_bytes))
+    else:
+        incluir_vistoria_email = False
 
     # — Gerar Contrato com Revisão —
     st.divider()
@@ -3036,7 +3063,7 @@ elif tipo_atendimento == "locacao":
     st.markdown("""
     <div class='card-section-neutral'>
         <p class='section-title'>✉️ Email profissional gerado automaticamente</p>
-        <p class='section-subtitle'>Edite livremente antes de enviar</p>
+        <p class='section-subtitle'>Revise e edite o texto antes de enviar</p>
     </div>
     """, unsafe_allow_html=True)
     assunto_loc_ini = "Documentação para análise de locação"
@@ -3051,12 +3078,9 @@ elif tipo_atendimento == "locacao":
     if st.button("📋 Copiar texto", use_container_width=True, key="copiar_loc"):
         st.code(f"Assunto: {assunto_loc_edit}\n\n{corpo_loc_edit}", language=None)
         st.caption("☝️ Selecione tudo (Ctrl+A) e copie (Ctrl+C)")
+
+    # ── Envio — aparece após revisão do email, no final ──
     st.divider()
-    st.markdown("""
-    <div class='card-section-neutral'>
-        <p class='section-title'>🚀 Enviar à imobiliária / proprietário</p>
-    </div>
-    """, unsafe_allow_html=True)
     cliente_sess_loc = st.session_state.get("cliente", {})
     is_pro_loc = cliente_sess_loc.get("plano","free") in ("mensal","semestral","anual")
     if not is_pro_loc:
@@ -3064,9 +3088,9 @@ elif tipo_atendimento == "locacao":
         LINK_SEMESTRAL = "https://kiwify.com.br/PLACEHOLDER_SEMESTRAL"
         LINK_ANUAL     = "https://kiwify.com.br/PLACEHOLDER_ANUAL"
         st.markdown("""
-        <div style='background:#EEF4FF;border:1px solid #BBCFEE;border-radius:10px;padding:16px 20px;margin-bottom:16px;'>
-            <div style='font-size:15px;font-weight:700;color:#1A3A6B;margin-bottom:4px;'>Envie diretamente à imobiliária com 1 clique</div>
-            <div style='font-size:13px;color:#4A6080;'>Mais agilidade, menos retrabalho. Escolha seu plano:</div>
+        <div style='background:#EEF4FF;border:1px solid #BBCFEE;border-radius:10px;padding:16px 20px;'>
+            <div style='font-size:15px;font-weight:700;color:#1A3A6B;margin-bottom:4px;'>🚀 Envie direto ao destinatário com 1 clique</div>
+            <div style='font-size:13px;color:#4A6080;margin-bottom:12px;'>Ative o plano Pro e envie sem copiar e colar:</div>
         </div>
         """, unsafe_allow_html=True)
         st.markdown(f"""<a href="{LINK_MENSAL}" target="_blank" style="display:block;text-align:center;
@@ -3082,24 +3106,30 @@ elif tipo_atendimento == "locacao":
             text-decoration:none;font-weight:700;margin-bottom:8px;font-size:14px;">
             🏆 Anual — R$ 75,00/mês &nbsp;·&nbsp; ⭐ Mais escolhido</a>""", unsafe_allow_html=True)
     else:
-        st.caption("Destino e Gmail configurados na barra lateral — pronto para enviar.")
-        if st.button("📧 Enviar à imobiliária agora", type="primary", use_container_width=True, key="enviar_loc"):
+        # Plano Pro ativo — botão de envio disponível após revisão do email
+        n_sel = len(selecionados_loc)
+        if n_sel:
+            st.caption(f"📎 {n_sel} arquivo(s) selecionado(s) · assunto e corpo editados acima")
+        else:
+            st.warning("⚠️ Nenhum arquivo selecionado — volte acima e marque ao menos um.")
+        if st.button("📧 Enviar ao destinatário agora", type="primary",
+                     use_container_width=True, key="enviar_loc", disabled=not n_sel):
             destino   = st.session_state.get("cfg_destino","")
             remetente = st.session_state.get("cfg_remetente","")
             senha     = st.session_state.get("cfg_senha","")
             if not destino or '@' not in destino:
-                st.error("❌ Configure o email destino na barra lateral.")
+                st.error("❌ Configure o email destino no painel abaixo (Configuração de envio).")
             elif not remetente or '@' not in remetente:
-                st.error("❌ Configure seu Gmail na barra lateral.")
+                st.error("❌ Configure seu Gmail no painel abaixo.")
             elif not senha:
-                st.error("❌ Configure a senha de app na barra lateral.")
+                st.error("❌ Configure a senha de app no painel abaixo.")
             else:
                 try:
                     with st.spinner("📧 Enviando documentação..."):
                         enviar_email(selecionados_loc, destino, remetente, senha, assunto_loc_edit, corpo_loc_edit)
-                    st.success(f"✅ Documentação enviada para {destino} — {len(selecionados_loc)} arquivo(s) anexado(s).")
+                    st.success(f"✅ Documentação enviada para {destino} — {n_sel} arquivo(s) anexado(s).")
                     if cliente_sess_loc:
-                        registrar_uso(cliente_sess_loc, qtd_arquivos=len(selecionados_loc), email_enviado=True)
+                        registrar_uso(cliente_sess_loc, qtd_arquivos=n_sel, email_enviado=True)
                 except smtplib.SMTPAuthenticationError:
                     st.error("❌ Autenticação falhou. Use senha de APP do Gmail.")
                 except Exception as e:
