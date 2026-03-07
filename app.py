@@ -3447,130 +3447,452 @@ elif tipo_atendimento == "credito_contrato":
 
 
 # ══════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════
 # FLUXO D — ALUGUEL / GERAR CONTRATO
 # ══════════════════════════════════════════════════════
 elif tipo_atendimento == "locacao_contrato":
+
+
+  # ── BLOCO 01 — LOCADOR ──
+  with st.container(border=True):
+      st.markdown("""
+      <div style='display:flex;align-items:center;gap:10px;margin-bottom:4px;'>
+          <span style='background:#E64A19;color:white;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;'>01</span>
+          <span style='font-size:15px;font-weight:700;color:#1A1A2E;'>🧑‍💼 Documentos do LOCADOR</span>
+      </div>
+      <div style='font-size:12px;color:#5C6B7A;margin-bottom:8px;'>Proprietário do imóvel — RG/CNH, CPF, comprovante de estado civil, comprovante de endereço</div>
+      """, unsafe_allow_html=True)
+      upload_loc_ct = st.file_uploader("Arraste ou clique para selecionar os documentos do Locador",
+          accept_multiple_files=True, type=["jpg","jpeg","png","bmp","webp","tiff","pdf"], key="upload_loc_ct")
+      col_lc1, col_lc2 = st.columns(2)
+      with col_lc1: st.text_input("📧 E-mail do Locador", placeholder="locador@email.com", key="email_manual_loc_ct")
+      with col_lc2: st.text_input("📱 Contato (WhatsApp/Tel)", placeholder="(81) 99999-0000", key="tel_manual_loc_ct")
+
+  # ── BLOCO 02 — LOCATÁRIO ──
+  with st.container(border=True):
+      st.markdown("""
+      <div style='display:flex;align-items:center;gap:10px;margin-bottom:4px;'>
+          <span style='background:#E64A19;color:white;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;'>02</span>
+          <span style='font-size:15px;font-weight:700;color:#1A1A2E;'>🔑 Documentos do LOCATÁRIO</span>
+      </div>
+      <div style='font-size:12px;color:#5C6B7A;margin-bottom:8px;'>Inquilino — RG/CNH, CPF, comprovante de renda, comprovante de residência</div>
+      """, unsafe_allow_html=True)
+      upload_locat_ct = st.file_uploader("Arraste ou clique para selecionar os documentos do Locatário",
+          accept_multiple_files=True, type=["jpg","jpeg","png","bmp","webp","tiff","pdf"], key="upload_locat_ct")
+      col_ltc1, col_ltc2 = st.columns(2)
+      with col_ltc1: st.text_input("📧 E-mail do Locatário", placeholder="locatario@email.com", key="email_manual_locat_ct")
+      with col_ltc2: st.text_input("📱 Contato (WhatsApp/Tel)", placeholder="(81) 99999-0000", key="tel_manual_locat_ct")
+
+  # ── BLOCO 03 — FIADOR ──
+  tem_fiador_ct = st.checkbox("Há fiador neste contrato?", key="tem_fiador_ct")
+  upload_fiad_ct = []
+  if tem_fiador_ct:
+      with st.container(border=True):
+          st.markdown("""
+          <div style='display:flex;align-items:center;gap:10px;margin-bottom:4px;'>
+              <span style='background:#E64A19;color:white;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;'>03</span>
+              <span style='font-size:15px;font-weight:700;color:#1A1A2E;'>🤝 Documentos do FIADOR</span>
+          </div>
+          <div style='font-size:12px;color:#5C6B7A;margin-bottom:8px;'>Garantidor — RG/CNH, CPF, comprovante de renda, residência e documento do imóvel próprio</div>
+          """, unsafe_allow_html=True)
+          upload_fiad_ct = st.file_uploader("Arraste ou clique para selecionar os documentos do Fiador",
+              accept_multiple_files=True, type=["jpg","jpeg","png","bmp","webp","tiff","pdf"], key="upload_fiad_ct")
+          col_fc1, col_fc2 = st.columns(2)
+          with col_fc1: st.text_input("📧 E-mail do Fiador", placeholder="fiador@email.com", key="email_manual_fiad_ct")
+          with col_fc2: st.text_input("📱 Contato (WhatsApp/Tel)", placeholder="(81) 99999-0000", key="tel_manual_fiad_ct")
+
+  # ── BLOCO 04 — DETALHES DO IMÓVEL ──
+  st.markdown("""
+<div class='card-section' style='border-left-color:#E64A19;'>
+    <span class='step-number' style='background:#E64A19;'>04</span>
+    <p class='section-title'>🏠 Detalhes do imóvel</p>
+    <p class='section-subtitle'>Preencha para gerar a cláusula contratual automaticamente</p>
+</div>
+""", unsafe_allow_html=True)
+
+  col_mat_ct, _ = st.columns(2)
+  with col_mat_ct:
+      matricula_ct = st.text_input("Matrícula do imóvel (opcional)", placeholder="Ex: 12.345", key="mat_imovel_ct")
+
+  st.markdown("<div style='font-size:13px;font-weight:700;color:#1A1A2E;margin:8px 0 6px 0;'>Finalidade do imóvel</div>", unsafe_allow_html=True)
+  col_f1ct, col_f2ct = st.columns(2)
+  with col_f1ct:
+      btn_res_ct = st.button("🏠  Residencial", use_container_width=True,
+          type="primary" if st.session_state.get("finalidade_imovel_ct") == "Residencial" else "secondary", key="btn_res_ct")
+  with col_f2ct:
+      btn_com_ct = st.button("🏢  Comercial", use_container_width=True,
+          type="primary" if st.session_state.get("finalidade_imovel_ct") == "Comercial" else "secondary", key="btn_com_ct")
+  if btn_res_ct: st.session_state["finalidade_imovel_ct"] = "Residencial"; st.rerun()
+  if btn_com_ct: st.session_state["finalidade_imovel_ct"] = "Comercial";   st.rerun()
+
+  finalidade_ct = st.session_state.get("finalidade_imovel_ct", "")
+  imovel_ct_dados = {"finalidade": finalidade_ct, "matricula": matricula_ct}
+
+  if finalidade_ct == "Residencial":
+      st.markdown("<div style='background:#F0F7F0;border-radius:8px;padding:16px;margin-top:8px;'>", unsafe_allow_html=True)
+      col_ti_ct, col_area_ct = st.columns(2)
+      with col_ti_ct:  tipo_res_ct = st.selectbox("Tipo de imóvel", ["Casa","Apartamento","Kitnet","Cobertura","Studio","Sobrado","Flat"], key="tipo_res_ct")
+      with col_area_ct: area_res_ct = st.number_input("Área (m²)", min_value=0.0, step=1.0, key="area_res_ct")
+      col_q_ct, col_s_ct, col_b_ct, col_sal_ct = st.columns(4)
+      with col_q_ct:   quartos_ct  = st.number_input("Quartos",   min_value=0, step=1, key="quartos_ct")
+      with col_s_ct:   suites_ct   = st.number_input("Suítes",    min_value=0, step=1, key="suites_ct")
+      with col_b_ct:   banhos_ct   = st.number_input("Banheiros", min_value=0, step=1, key="banhos_ct")
+      with col_sal_ct: salas_ct    = st.number_input("Salas",     min_value=0, step=1, key="salas_ct")
+      col_v_ct, col_mob_ct = st.columns(2)
+      with col_v_ct:   vagas_ct    = st.number_input("Vagas de garagem", min_value=0, step=1, key="vagas_ct")
+      with col_mob_ct: mob_ct      = st.selectbox("Mobiliado", ["Não","Parcial","Total"], key="mob_ct")
+      st.markdown("</div>", unsafe_allow_html=True)
+      imovel_ct_dados.update({"tipo_imovel": tipo_res_ct, "area": area_res_ct if area_res_ct > 0 else "",
+          "quartos": quartos_ct, "suites": suites_ct, "banheiros": banhos_ct,
+          "salas": salas_ct, "vagas": vagas_ct, "mobiliado": mob_ct})
+
+  elif finalidade_ct == "Comercial":
+      st.markdown("<div style='background:#F0F4FF;border-radius:8px;padding:16px;margin-top:8px;'>", unsafe_allow_html=True)
+      col_tc_ct, col_areac_ct = st.columns(2)
+      with col_tc_ct:    tipo_com_ct  = st.selectbox("Tipo de imóvel", ["Sala comercial","Loja","Galpão","Consultório","Coworking","Pavilhão","Conjunto comercial"], key="tipo_com_ct")
+      with col_areac_ct: area_com_ct  = st.number_input("Área (m²)", min_value=0.0, step=1.0, key="area_com_ct")
+      ativ_ct  = st.text_input("Atividade permitida", placeholder="Ex: Comércio varejista de vestuário", key="ativ_ct")
+      st.markdown("</div>", unsafe_allow_html=True)
+      imovel_ct_dados.update({"tipo_imovel": tipo_com_ct, "area": area_com_ct if area_com_ct > 0 else "",
+          "atividade_permitida": ativ_ct})
+
+  fotos_upload_ct = []
+
+  # ── BLOCO 05 — CONDIÇÕES FINANCEIRAS ──
+  st.markdown("""
+<div class='card-section' style='border-left-color:#E64A19;'>
+    <span class='step-number' style='background:#E64A19;'>05</span>
+    <p class='section-title'>💰 Condições financeiras do contrato</p>
+    <p class='section-subtitle'>Valor, forma de pagamento e prazo</p>
+</div>
+""", unsafe_allow_html=True)
+
+  col_val_ct, col_venc_ct = st.columns(2)
+  with col_val_ct:
+      valor_aluguel_ct = st.number_input("Valor do aluguel (R$)", min_value=0.0, step=50.0, format="%.2f", key="valor_aluguel_ct")
+  with col_venc_ct:
+      dia_vencimento_ct = st.number_input("Dia de vencimento", min_value=1, max_value=28, value=5, step=1, key="dia_vencimento_ct")
+  col_pag_ct, col_dur_ct = st.columns(2)
+  with col_pag_ct:
+      forma_pagamento_ct = st.selectbox("Forma de pagamento", ["PIX","Boleto","Transferência bancária","Dinheiro"], key="forma_pagamento_ct")
+  with col_dur_ct:
+      duracao_contrato_ct = st.selectbox("Duração do contrato", ["12 meses","24 meses","30 meses","36 meses","Indeterminado"], key="duracao_contrato_ct")
+  data_inicio_ct = st.date_input("Data de início do contrato", key="data_inicio_ct")
+  pix_dados_ct = {}
+  if forma_pagamento_ct == "PIX":
+      st.markdown("<div style='background:#F0F7F0;border-radius:8px;padding:14px;margin-top:6px;'>", unsafe_allow_html=True)
+      col_p1ct, col_p2ct = st.columns(2)
+      with col_p1ct:
+          pix_chave_ct      = st.text_input("Chave PIX", placeholder="CPF, e-mail, telefone ou aleatória", key="pix_chave_ct")
+          pix_favorecido_ct = st.text_input("Nome do favorecido", key="pix_favorecido_ct")
+      with col_p2ct:
+          pix_banco_ct = st.text_input("Banco", key="pix_banco_ct")
+          pix_tipo_ct  = st.selectbox("Tipo de chave", ["CPF","CNPJ","E-mail","Telefone","Chave aleatória"], key="pix_tipo_ct")
+      st.markdown("</div>", unsafe_allow_html=True)
+      pix_dados_ct = {"chave": pix_chave_ct, "favorecido": pix_favorecido_ct, "banco": pix_banco_ct, "tipo": pix_tipo_ct}
+
+  imovel_ct_dados.update({
+      "valor_aluguel":    valor_aluguel_ct,
+      "dia_vencimento":   dia_vencimento_ct,
+      "forma_pagamento":  forma_pagamento_ct,
+      "duracao_contrato": duracao_contrato_ct,
+      "data_inicio":      str(data_inicio_ct),
+      "pix_dados":        pix_dados_ct,
+  })
+
+  # ── BLOCO 06 — INTERMEDIAÇÃO ──
+  st.markdown("""
+<div class='card-section' style='border-left-color:#6A1B9A;'>
+    <span class='step-number' style='background:#6A1B9A;'>06</span>
+    <p class='section-title'>🤝 Intermediação Imobiliária</p>
+    <p class='section-subtitle'>Dados do corretor ou imobiliária responsável</p>
+</div>
+""", unsafe_allow_html=True)
+
+  tem_interm_ct = st.checkbox("Há intermediação imobiliária neste contrato?", key="tem_interm_ct", value=True)
+  interm_ct = {}
+  if tem_interm_ct:
+      st.markdown("<div style='background:#F9F0FF;border-radius:8px;padding:16px;margin-top:4px;'>", unsafe_allow_html=True)
+      col_ti1_ct, col_ti2_ct = st.columns(2)
+      with col_ti1_ct: tipo_interm_ct  = st.selectbox("Tipo de intermediador", ["Corretor Autônomo","Imobiliária (Pessoa Jurídica)"], key="tipo_interm_ct")
+      with col_ti2_ct: creci_interm_ct = st.text_input("CRECI / CNPJ", key="creci_interm_ct")
+      nome_interm_ct = st.text_input("Nome completo / Razão social", key="nome_interm_ct")
+      col_ti3_ct, col_ti4_ct = st.columns(2)
+      with col_ti3_ct: cpf_cnpj_interm_ct = st.text_input("CPF / CNPJ do intermediador", key="cpf_cnpj_interm_ct")
+      with col_ti4_ct: tel_interm_ct      = st.text_input("Telefone", key="tel_interm_ct")
+      st.markdown("---")
+      st.markdown("<div style='font-size:13px;font-weight:700;color:#6A1B9A;margin-bottom:8px;'>💰 Comissão de Locação (1º aluguel)</div>", unsafe_allow_html=True)
+      col_tc1_ct, col_tc2_ct = st.columns(2)
+      with col_tc1_ct:
+          modelo_com_ct = st.selectbox("Modelo de comissão", [
+              "1º aluguel integral ao intermediador",
+              "50% ao intermediador / 50% ao proprietário",
+              "Percentual do 1º aluguel","Valor fixo combinado"], key="modelo_com_ct")
+      with col_tc2_ct:
+          if modelo_com_ct == "Percentual do 1º aluguel":
+              pct_com_ct = st.number_input("Percentual (%)", min_value=0.0, max_value=100.0, value=100.0, step=5.0, key="pct_com_ct")
+              val_com_ct_str = f"{pct_com_ct}% do 1º aluguel"
+          elif modelo_com_ct == "Valor fixo combinado":
+              val_com_ct_num = st.number_input("Valor fixo (R$)", min_value=0.0, step=50.0, key="val_com_ct_num")
+              val_com_ct_str = f"R$ {val_com_ct_num:,.2f}".replace(",","X").replace(".",",").replace("X",".")
+          elif modelo_com_ct == "50% ao intermediador / 50% ao proprietário":
+              val_com_ct_str = "50% ao intermediador / 50% ao proprietário"
+              st.caption("50% intermediador / 50% proprietário")
+          else:
+              val_com_ct_str = "1º aluguel integral"
+              st.caption("100% do 1º aluguel ao intermediador")
+      st.markdown("---")
+      st.markdown("<div style='font-size:13px;font-weight:700;color:#6A1B9A;margin-bottom:8px;'>📋 Taxa de Administração (mensal)</div>", unsafe_allow_html=True)
+      tem_adm_ct = st.checkbox("Há taxa de administração mensal?", key="tem_adm_ct")
+      taxa_adm_ct_str = ""
+      servicos_adm_ct = []
+      if tem_adm_ct:
+          col_adm1_ct, col_adm2_ct = st.columns(2)
+          with col_adm1_ct: pct_adm_ct  = st.number_input("Percentual (%)", min_value=0.0, max_value=30.0, value=10.0, step=0.5, key="pct_adm_ct")
+          with col_adm2_ct: base_adm_ct = st.selectbox("Base de cálculo", ["Sobre o valor do aluguel","Sobre o valor total (aluguel + encargos)"], key="base_adm_ct")
+          taxa_adm_ct_str = f"{pct_adm_ct}% ao mês — {base_adm_ct.lower()}"
+          servicos_adm_ct = st.multiselect("Serviços incluídos", ["Cobrança de aluguel","Repasse ao proprietário","Gestão de inadimplência","Vistoria periódica","Renovação contratual","Atendimento ao locatário"],
+              default=["Cobrança de aluguel","Repasse ao proprietário"], key="servicos_adm_ct")
+      st.markdown("---")
+      st.markdown("<div style='font-size:13px;font-weight:700;color:#6A1B9A;margin-bottom:8px;'>📅 Vigência da Intermediação</div>", unsafe_allow_html=True)
+      col_vig1_ct, col_vig2_ct = st.columns(2)
+      with col_vig1_ct: vigencia_interm_ct = st.selectbox("Vigência do mandato", ["Mesma vigência do contrato de locação","12 meses renovável","24 meses renovável","Indeterminada"], key="vigencia_interm_ct")
+      with col_vig2_ct: aviso_interm_ct    = st.selectbox("Aviso prévio para rescisão", ["30 dias","60 dias","90 dias"], key="aviso_interm_ct")
+      email_interm_ct = st.text_input("E-mail do intermediador", placeholder="corretor@email.com", key="email_interm_ct")
+      st.markdown("</div>", unsafe_allow_html=True)
+      interm_ct = {"tipo": tipo_interm_ct, "nome": nome_interm_ct, "creci_cnpj": creci_interm_ct,
+          "cpf_cnpj": cpf_cnpj_interm_ct, "telefone": tel_interm_ct, "email": email_interm_ct,
+          "modelo_comissao": modelo_com_ct, "valor_comissao": val_com_ct_str,
+          "tem_adm": tem_adm_ct, "taxa_adm": taxa_adm_ct_str, "servicos_adm": servicos_adm_ct,
+          "vigencia": vigencia_interm_ct, "aviso_rescisao": aviso_interm_ct}
+
+  imovel_ct_dados["intermediacao"] = interm_ct
+
+  # ── BOTÃO PROCESSAR ──
+  st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+  processar_loc_ct = st.button("⚡  ANALISAR DOCUMENTAÇÃO E GERAR CONTRATO", type="primary", use_container_width=True, key="btn_processar_loc_ct")
+
+  if processar_loc_ct:
+    erros_ct = []
+    if not upload_loc_ct:   erros_ct.append("📂 Envie os documentos do **LOCADOR** (Bloco 01)")
+    if not upload_locat_ct: erros_ct.append("📂 Envie os documentos do **LOCATÁRIO** (Bloco 02)")
+    if tem_fiador_ct and not upload_fiad_ct: erros_ct.append("📂 Fiador marcado: envie os documentos do **FIADOR** (Bloco 03)")
+    if erros_ct:
+        for e in erros_ct: st.error(e)
+    else:
+        def _bytes_polo_ct(upload_list):
+            result = []
+            for arq in upload_list:
+                conteudo = arq.read()
+                result.append((arq.name, conteudo, "pdf" if arq.name.lower().endswith('.pdf') else "imagem"))
+            return result
+
+        barra = st.progress(0, text="⚡ Processando documentos em paralelo...")
+        bytes_loc_ct   = _bytes_polo_ct(upload_loc_ct)
+        bytes_locat_ct = _bytes_polo_ct(upload_locat_ct)
+        bytes_fiad_ct  = _bytes_polo_ct(upload_fiad_ct) if upload_fiad_ct else []
+
+        from concurrent.futures import ThreadPoolExecutor, as_completed as _ac_ct
+
+        _res_ct2 = {}
+        def _t_ct(nome, fn, *args):
+            try: return nome, fn(*args), None
+            except Exception as e: return nome, None, str(e)
+
+        tarefas_ct = [
+            ("pdfs_loc",   processar_documentos, bytes_loc_ct),
+            ("pdfs_locat", processar_documentos, bytes_locat_ct),
+            ("dados_loc",  extrair_dados_polo,   bytes_loc_ct,   "locador"),
+            ("dados_locat",extrair_dados_polo,   bytes_locat_ct, "locatario"),
+        ]
+        if bytes_fiad_ct:
+            tarefas_ct += [
+                ("pdfs_fiad",  processar_documentos, bytes_fiad_ct),
+                ("dados_fiad", extrair_dados_polo,   bytes_fiad_ct, "fiador"),
+            ]
+        total_ct = len(tarefas_ct)
+        done_ct = 0
+        with ThreadPoolExecutor(max_workers=total_ct) as _ex_ct:
+            futures_ct = {_ex_ct.submit(_t_ct, t[0], t[1], *t[2:]): t[0] for t in tarefas_ct}
+            for _f_ct in _ac_ct(futures_ct):
+                _n_ct, _r_ct, _e_ct = _f_ct.result()
+                done_ct += 1
+                barra.progress(int(done_ct/total_ct*75), text=f"⚡ Processando... {done_ct}/{total_ct}")
+                if not _e_ct: _res_ct2[_n_ct] = _r_ct
+
+        d_loc_ct2   = _res_ct2.get("dados_loc",  {}) or {}
+        d_locat_ct2 = _res_ct2.get("dados_locat",{}) or {}
+        d_fiad_ct2  = _res_ct2.get("dados_fiad", {}) or {}
+        pdfs_loc_ct2   = _res_ct2.get("pdfs_loc",   [])
+        pdfs_locat_ct2 = _res_ct2.get("pdfs_locat", [])
+        pdfs_fiad_ct2  = _res_ct2.get("pdfs_fiad",  [])
+
+        # Mesclar campos manuais
+        for k_email, k_tel, d in [
+            ("email_manual_loc_ct",  "tel_manual_loc_ct",  d_loc_ct2),
+            ("email_manual_locat_ct","tel_manual_locat_ct",d_locat_ct2),
+            ("email_manual_fiad_ct", "tel_manual_fiad_ct", d_fiad_ct2),
+        ]:
+            em = st.session_state.get(k_email,"").strip()
+            tl = st.session_state.get(k_tel,"").strip()
+            if em: d["email"]    = em
+            if tl: d["telefone"] = tl
+
+        # Cláusula contratual
+        clausula_ct2 = gerar_clausula_residencial(imovel_ct_dados) if finalidade_ct == "Residencial" else gerar_clausula_comercial(imovel_ct_dados) if finalidade_ct == "Comercial" else ""
+
+        barra.progress(100, text="✅ Pronto!")
+        time.sleep(0.3); barra.empty()
+
+        st.session_state["lc_dados_loc"]  = d_loc_ct2
+        st.session_state["lc_dados_locat"]= d_locat_ct2
+        st.session_state["lc_dados_fiad"] = d_fiad_ct2
+        st.session_state["lc_imovel"]     = imovel_ct_dados
+        st.session_state["lc_clausula"]   = clausula_ct2
+        st.session_state["lc_processado"] = True
+        cliente_lc = st.session_state.get("cliente")
+        if cliente_lc:
+            registrar_uso(cliente_lc, qtd_arquivos=len(bytes_loc_ct)+len(bytes_locat_ct)+len(bytes_fiad_ct))
+
+  if st.session_state.get("lc_processado"):
+    lc_d_loc      = st.session_state.get("lc_dados_loc",  {})
+    lc_d_locat    = st.session_state.get("lc_dados_locat",{})
+    lc_d_fiad     = st.session_state.get("lc_dados_fiad", {})
+    lc_imovel     = st.session_state.get("lc_imovel",     {})
+    lc_clausula   = st.session_state.get("lc_clausula",   "")
+
+    st.divider()
     st.markdown("""
-    <div class='card-section' style='border-left-color:#E64A19;'>
-        <span class='step-number' style='background:#E64A19;'>01</span>
-        <p class='section-title'>Gerar Contrato de Locação</p>
-        <p class='section-subtitle'>Envie os documentos do locador, locatário e fiador — a IA monta o contrato</p>
+    <div class='card-section-neutral'>
+        <p class='section-title'>📄 Gerar Contrato de Locação</p>
+        <p class='section-subtitle'>Revise e edite os dados antes de gerar o PDF</p>
     </div>
     """, unsafe_allow_html=True)
 
-    with st.container(border=True):
-        st.markdown("<div style='font-size:14px;font-weight:700;color:#1A1A2E;margin-bottom:8px;'>🧑‍💼 Documentos do Locador (Proprietário)</div>", unsafe_allow_html=True)
-        upload_loc_ct = st.file_uploader("Locador", accept_multiple_files=True,
-            type=["jpg","jpeg","png","bmp","webp","tiff","pdf"], key="upload_loc_ct",
-            label_visibility="collapsed")
+    if st.button("📝  REVISAR E EDITAR DADOS DO CONTRATO", type="primary", use_container_width=True, key="btn_revisar_lc"):
+        st.session_state["lc_revisao_aberta"] = True
+        st.session_state["lc_contrato_bytes"] = None
 
-    with st.container(border=True):
-        st.markdown("<div style='font-size:14px;font-weight:700;color:#1A1A2E;margin-bottom:8px;'>🔑 Documentos do Locatário (Inquilino)</div>", unsafe_allow_html=True)
-        upload_locat_ct = st.file_uploader("Locatário", accept_multiple_files=True,
-            type=["jpg","jpeg","png","bmp","webp","tiff","pdf"], key="upload_locat_ct",
-            label_visibility="collapsed")
+    if st.session_state.get("lc_revisao_aberta"):
+        st.markdown("<div style='background:#EEF4FF;border:1px solid #BBCFEE;border-radius:10px;padding:18px 22px;margin:12px 0;'>", unsafe_allow_html=True)
+        st.markdown("#### ✏️ Revise os dados — edite o que precisar antes de gerar o PDF")
 
-    with st.container(border=True):
-        st.markdown("<div style='font-size:14px;font-weight:700;color:#1A1A2E;margin-bottom:8px;'>🤝 Documentos do Fiador (opcional)</div>", unsafe_allow_html=True)
-        upload_fiad_ct = st.file_uploader("Fiador", accept_multiple_files=True,
-            type=["jpg","jpeg","png","bmp","webp","tiff","pdf"], key="upload_fiad_ct",
-            label_visibility="collapsed")
+        st.markdown("---"); st.markdown("**🧑‍💼 LOCADOR (Proprietário)**")
+        col1, col2 = st.columns(2)
+        with col1:
+            lc_r_loc_nome  = st.text_input("Nome completo",   value=lc_d_loc.get("nome_completo",""), key="lc_r_loc_nome")
+            lc_r_loc_cpf   = st.text_input("CPF",             value=lc_d_loc.get("cpf",""),           key="lc_r_loc_cpf")
+            lc_r_loc_rg    = st.text_input("RG",              value=lc_d_loc.get("rg",""),            key="lc_r_loc_rg")
+            lc_r_loc_orgao = st.text_input("Órgão expedidor", value=lc_d_loc.get("orgao_expedidor",""),key="lc_r_loc_orgao")
+        with col2:
+            lc_r_loc_eciv  = st.text_input("Estado civil",    value=lc_d_loc.get("estado_civil",""),  key="lc_r_loc_eciv")
+            lc_r_loc_prof  = st.text_input("Profissão",       value=lc_d_loc.get("profissao",""),     key="lc_r_loc_prof")
+            lc_r_loc_tel   = st.text_input("Telefone",        value=lc_d_loc.get("telefone",""),      key="lc_r_loc_tel")
+            lc_r_loc_email = st.text_input("E-mail",          value=lc_d_loc.get("email",""),         key="lc_r_loc_email")
+        lc_r_loc_end = st.text_input("Endereço completo", value=lc_d_loc.get("endereco",""), key="lc_r_loc_end")
 
-    # Detalhes do imóvel
-    st.markdown("<div style='font-size:13px;font-weight:700;color:#1A1A2E;margin:16px 0 8px 0;'>🏠 Detalhes do Imóvel</div>", unsafe_allow_html=True)
-    col_ct1, col_ct2, col_ct3 = st.columns(3)
-    with col_ct1:
-        val_ct = st.text_input("Valor do aluguel (R$)", placeholder="Ex: 1.500,00", key="val_ct")
-    with col_ct2:
-        dur_ct = st.text_input("Duração do contrato", placeholder="Ex: 12 meses", key="dur_ct")
-    with col_ct3:
-        fin_ct = st.selectbox("Finalidade", ["Residencial","Comercial"], key="fin_ct")
-    col_ct4, col_ct5 = st.columns([3,1])
-    with col_ct4:
-        cid_ct = st.text_input("Cidade do imóvel", placeholder="Ex: Caruaru", key="cid_ct")
-    with col_ct5:
-        uf_ct  = st.text_input("UF", placeholder="PE", key="uf_ct")
+        st.markdown("---"); st.markdown("**🔑 LOCATÁRIO (Inquilino)**")
+        col1, col2 = st.columns(2)
+        with col1:
+            lc_r_locat_nome  = st.text_input("Nome completo",   value=lc_d_locat.get("nome_completo",""), key="lc_r_locat_nome")
+            lc_r_locat_cpf   = st.text_input("CPF",             value=lc_d_locat.get("cpf",""),           key="lc_r_locat_cpf")
+            lc_r_locat_rg    = st.text_input("RG",              value=lc_d_locat.get("rg",""),            key="lc_r_locat_rg")
+            lc_r_locat_orgao = st.text_input("Órgão expedidor", value=lc_d_locat.get("orgao_expedidor",""),key="lc_r_locat_orgao")
+        with col2:
+            lc_r_locat_eciv  = st.text_input("Estado civil",    value=lc_d_locat.get("estado_civil",""),  key="lc_r_locat_eciv")
+            lc_r_locat_prof  = st.text_input("Profissão",       value=lc_d_locat.get("profissao",""),     key="lc_r_locat_prof")
+            lc_r_locat_tel   = st.text_input("Telefone",        value=lc_d_locat.get("telefone",""),      key="lc_r_locat_tel")
+            lc_r_locat_email = st.text_input("E-mail",          value=lc_d_locat.get("email",""),         key="lc_r_locat_email")
+        lc_r_locat_end = st.text_input("Endereço completo", value=lc_d_locat.get("endereco",""), key="lc_r_locat_end")
 
-    texto_ct = st.text_area("Informações adicionais (opcional)", height=80,
-        placeholder="Endereço completo, matrícula, forma de pagamento...",
-        key="texto_locacao_contrato")
-
-    if st.button("📄  GERAR CONTRATO DE LOCAÇÃO", type="primary", use_container_width=True, key="btn_gerar_loc_ct"):
-        arqs_loc_ct   = [(a.name, a.read(), "pdf" if a.name.lower().endswith('.pdf') else "imagem") for a in (upload_loc_ct   or [])]
-        arqs_locat_ct = [(a.name, a.read(), "pdf" if a.name.lower().endswith('.pdf') else "imagem") for a in (upload_locat_ct or [])]
-        arqs_fiad_ct  = [(a.name, a.read(), "pdf" if a.name.lower().endswith('.pdf') else "imagem") for a in (upload_fiad_ct  or [])]
-
-        if not arqs_loc_ct and not arqs_locat_ct:
-            st.error("⚠️ Envie pelo menos os documentos do Locador ou do Locatário.")
+        if lc_d_fiad and lc_d_fiad.get("nome_completo"):
+            st.markdown("---"); st.markdown("**🤝 FIADOR**")
+            col1, col2 = st.columns(2)
+            with col1:
+                lc_r_fiad_nome  = st.text_input("Nome completo",   value=lc_d_fiad.get("nome_completo",""), key="lc_r_fiad_nome")
+                lc_r_fiad_cpf   = st.text_input("CPF",             value=lc_d_fiad.get("cpf",""),           key="lc_r_fiad_cpf")
+                lc_r_fiad_rg    = st.text_input("RG",              value=lc_d_fiad.get("rg",""),            key="lc_r_fiad_rg")
+                lc_r_fiad_orgao = st.text_input("Órgão expedidor", value=lc_d_fiad.get("orgao_expedidor",""),key="lc_r_fiad_orgao")
+            with col2:
+                lc_r_fiad_eciv  = st.text_input("Estado civil",    value=lc_d_fiad.get("estado_civil",""),  key="lc_r_fiad_eciv")
+                lc_r_fiad_prof  = st.text_input("Profissão",       value=lc_d_fiad.get("profissao",""),     key="lc_r_fiad_prof")
+                lc_r_fiad_tel   = st.text_input("Telefone",        value=lc_d_fiad.get("telefone",""),      key="lc_r_fiad_tel")
+                lc_r_fiad_email = st.text_input("E-mail",          value=lc_d_fiad.get("email",""),         key="lc_r_fiad_email")
+            lc_r_fiad_end = st.text_input("Endereço completo", value=lc_d_fiad.get("endereco",""), key="lc_r_fiad_end")
         else:
-            barra = st.progress(0, text="⚡ Extraindo dados dos documentos...")
-            texto_extra_ct = st.session_state.get("texto_locacao_contrato","")
-            from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed2
+            lc_r_fiad_nome=lc_r_fiad_cpf=lc_r_fiad_rg=lc_r_fiad_orgao=""
+            lc_r_fiad_eciv=lc_r_fiad_prof=lc_r_fiad_tel=lc_r_fiad_email=lc_r_fiad_end=""
 
-            _res_ct = {}
-            def _tarefa_ct(nome, fn, *args):
-                try: return nome, fn(*args), None
-                except Exception as e: return nome, None, str(e)
+        st.markdown("---"); st.markdown("**🏡 IMÓVEL E CONDIÇÕES FINANCEIRAS**")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            lc_r_tipo   = st.text_input("Tipo do imóvel",         value=lc_imovel.get("tipo_imovel","Casa"),        key="lc_r_tipo")
+            lc_r_area   = st.text_input("Área (m²)",              value=str(lc_imovel.get("area","")),              key="lc_r_area")
+            lc_r_mat    = st.text_input("Matrícula",              value=lc_imovel.get("matricula",""),              key="lc_r_mat")
+        with col2:
+            lc_r_valor  = st.text_input("Valor do aluguel (R$)",  value=str(lc_imovel.get("valor_aluguel","")),     key="lc_r_valor")
+            lc_r_dia    = st.text_input("Dia de vencimento",      value=str(lc_imovel.get("dia_vencimento",5)),     key="lc_r_dia")
+            lc_r_pag    = st.text_input("Forma de pagamento",     value=lc_imovel.get("forma_pagamento",""),        key="lc_r_pag")
+        with col3:
+            lc_r_dur    = st.text_input("Duração do contrato",    value=lc_imovel.get("duracao_contrato","12 meses"),key="lc_r_dur")
+            lc_r_inicio = st.text_input("Data de início",         value=str(lc_imovel.get("data_inicio","")),       key="lc_r_inicio")
+            lc_r_fin    = st.text_input("Finalidade",             value=lc_imovel.get("finalidade","Residencial"),  key="lc_r_fin")
+        col_cid_lc, col_uf_lc = st.columns([3,1])
+        with col_cid_lc: lc_r_cidade = st.text_input("🏙️ Cidade (foro contratual)", value=lc_imovel.get("cidade",""), key="lc_r_cidade")
+        with col_uf_lc:  lc_r_uf     = st.text_input("UF", value=lc_imovel.get("uf","PE"), key="lc_r_uf")
 
-            with ThreadPoolExecutor(max_workers=3) as _ex2:
-                _futs = {}
-                if arqs_loc_ct:
-                    _futs[_ex2.submit(_tarefa_ct, "locador",   extrair_dados_polo, arqs_loc_ct,   "locador")]   = "locador"
-                if arqs_locat_ct:
-                    _futs[_ex2.submit(_tarefa_ct, "locatario", extrair_dados_polo, arqs_locat_ct, "locatario")] = "locatario"
-                if arqs_fiad_ct:
-                    _futs[_ex2.submit(_tarefa_ct, "fiador",    extrair_dados_polo, arqs_fiad_ct,  "fiador")]    = "fiador"
-                _done_ct = 0
-                _total_ct = len(_futs)
-                for _f2 in _as_completed2(_futs):
-                    _n2, _r2, _e2 = _f2.result()
-                    _done_ct += 1
-                    barra.progress(int(_done_ct/_total_ct*70), text=f"⚡ Extraindo... {_done_ct}/{_total_ct}")
-                    if not _e2: _res_ct[_n2] = _r2
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
-            barra.progress(80, text="📄 Gerando contrato...")
-            d_loc_ct   = _res_ct.get("locador",   {}) or {}
-            d_locat_ct = _res_ct.get("locatario", {}) or {}
-            d_fiad_ct  = _res_ct.get("fiador",    {}) or {}
-
-            imovel_ct = {
-                "finalidade":       fin_ct,
-                "tipo_imovel":      "imóvel",
-                "valor_aluguel":    val_ct,
-                "duracao_contrato": dur_ct or "12 meses",
-                "cidade":           cid_ct,
-                "uf":               uf_ct  or "PE",
-                "dia_vencimento":   5,
-                "forma_pagamento":  "",
-            }
-            clausula_ct = gerar_clausula_residencial(imovel_ct) if fin_ct == "Residencial" else gerar_clausula_comercial(imovel_ct)
-            contrato_loc_ct_bytes = gerar_contrato_pdf(d_loc_ct, d_locat_ct, d_fiad_ct, imovel_ct, clausula_ct)
-            barra.progress(100, text="✅ Contrato pronto!")
-            time.sleep(0.3); barra.empty()
-            st.session_state["contrato_loc_ct_bytes"] = contrato_loc_ct_bytes
-            cliente_sess_lct = st.session_state.get("cliente")
-            if cliente_sess_lct:
-                registrar_uso(cliente_sess_lct, qtd_arquivos=len(arqs_loc_ct)+len(arqs_locat_ct))
-
-    if st.session_state.get("contrato_loc_ct_bytes"):
-        st.success("✅ Contrato de locação gerado com sucesso!")
-        st.download_button(
-            "⬇️ Baixar Contrato de Locação (PDF)",
-            data=st.session_state["contrato_loc_ct_bytes"],
-            file_name="Contrato_Locacao.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-            key="dl_contrato_loc_ct"
-        )
-        if st.button("✏️ Gerar novo contrato", use_container_width=True, key="btn_novo_loc_ct"):
-            st.session_state.pop("contrato_loc_ct_bytes", None)
+        if st.button("📄  GERAR CONTRATO COM DADOS REVISADOS", type="primary", use_container_width=True, key="btn_gerar_lc"):
+            rev_loc   = {"nome_completo": lc_r_loc_nome,  "cpf": lc_r_loc_cpf,  "rg": lc_r_loc_rg,
+                         "orgao_expedidor": lc_r_loc_orgao, "estado_civil": lc_r_loc_eciv, "profissao": lc_r_loc_prof,
+                         "endereco": lc_r_loc_end, "telefone": lc_r_loc_tel, "email": lc_r_loc_email}
+            rev_locat = {"nome_completo": lc_r_locat_nome,"cpf": lc_r_locat_cpf,"rg": lc_r_locat_rg,
+                         "orgao_expedidor": lc_r_locat_orgao,"estado_civil": lc_r_locat_eciv,"profissao": lc_r_locat_prof,
+                         "endereco": lc_r_locat_end,"telefone": lc_r_locat_tel,"email": lc_r_locat_email}
+            rev_fiad  = {"nome_completo": lc_r_fiad_nome, "cpf": lc_r_fiad_cpf, "rg": lc_r_fiad_rg,
+                         "orgao_expedidor": lc_r_fiad_orgao,"estado_civil": lc_r_fiad_eciv,"profissao": lc_r_fiad_prof,
+                         "endereco": lc_r_fiad_end,"telefone": lc_r_fiad_tel,"email": lc_r_fiad_email} if lc_r_fiad_nome else {}
+            rev_imovel = dict(lc_imovel)
+            rev_imovel.update({"tipo_imovel": lc_r_tipo, "area": lc_r_area, "matricula": lc_r_mat,
+                "valor_aluguel": lc_r_valor, "dia_vencimento": lc_r_dia, "forma_pagamento": lc_r_pag,
+                "duracao_contrato": lc_r_dur, "data_inicio": lc_r_inicio, "finalidade": lc_r_fin,
+                "cidade": lc_r_cidade, "uf": lc_r_uf})
+            with st.spinner("⚙️ Gerando contrato..."):
+                rev_clausula = gerar_clausula_residencial(rev_imovel) if lc_r_fin == "Residencial" else gerar_clausula_comercial(rev_imovel)
+                lc_pdf = gerar_contrato_pdf(rev_loc, rev_locat, rev_fiad, rev_imovel, rev_clausula,
+                                            intermediacao=rev_imovel.get("intermediacao", interm_ct))
+                st.session_state["lc_contrato_bytes"] = lc_pdf
+                st.session_state["lc_revisao_aberta"] = False
+            st.success("✅ Contrato gerado!")
             st.rerun()
 
-    st.divider()
-    if st.button("🔄 Novo atendimento", use_container_width=True, key="novo_loc_ct"):
-        for key in ["contrato_loc_ct_bytes","tipo_atendimento"]:
-            st.session_state.pop(key, None)
-        st.rerun()
+    if st.session_state.get("lc_contrato_bytes"):
+        st.download_button("⬇️ Baixar Contrato de Locação (PDF)",
+            data=st.session_state["lc_contrato_bytes"],
+            file_name="Contrato_Locacao.pdf", mime="application/pdf",
+            use_container_width=True, key="dl_lc_contrato")
+        st.markdown("""
+        <a href="javascript:window.print()" target="_self"
+            style="display:block;text-align:center;padding:13px;background:#E64A19;color:white;
+            border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;margin-top:8px;">
+            🖨️ Imprimir Contrato
+        </a>
+        """, unsafe_allow_html=True)
+        st.success("✅ Contrato pronto! Baixe ou imprima antes de assinar.")
+        if st.button("✏️ Editar dados novamente", use_container_width=True, key="btn_reeditar_lc"):
+            st.session_state["lc_revisao_aberta"] = True
+            st.session_state["lc_contrato_bytes"] = None
+            st.rerun()
+
+  st.divider()
+  if st.button("🔄 Novo atendimento", use_container_width=True, key="novo_loc_ct"):
+      for key in ["lc_processado","lc_pdfs_loc","lc_pdfs_locat","lc_pdfs_fiad",
+                  "lc_dados_loc","lc_dados_locat","lc_dados_fiad","lc_imovel",
+                  "lc_clausula","lc_termo_vis","lc_contrato_bytes","lc_revisao_aberta","tipo_atendimento"]:
+          st.session_state.pop(key, None)
+      st.rerun()
 
 
 # ── Barra discreta de conta (páginas de serviço) ──
