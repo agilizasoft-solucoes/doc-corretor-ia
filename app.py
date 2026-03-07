@@ -3361,6 +3361,14 @@ if tipo_atendimento == "credito":
 # ══════════════════════════════════════════════════════
 elif tipo_atendimento == "locacao":
 
+  # ── DEBUG TEMPORÁRIO ──
+  _dbg_modo     = st.session_state.get("modo_interface", "?")
+  _dbg_dados    = st.session_state.get("quiz_imovel_dados") is not None
+  _dbg_flag     = st.session_state.get("quiz_iniciar_processamento", "NÃO EXISTE")
+  _dbg_bytes_l  = len(st.session_state.get("_bytes_upload_locador", []))
+  _dbg_bytes_lt = len(st.session_state.get("_bytes_upload_locatario", []))
+  st.info(f"🔍 DEBUG: modo={_dbg_modo} | quiz_dados={_dbg_dados} | flag_processar={_dbg_flag} | bytes_loc={_dbg_bytes_l} | bytes_loct={_dbg_bytes_lt}")
+
   # ── Se vier do modo quiz com flag de processar, pula toda a UI e vai direto ──
   _vindo_do_quiz = (
       st.session_state.get("modo_interface") == "quiz"
