@@ -2890,37 +2890,36 @@ def quiz_etapa_6():
             etapa=6, total=6
         )
 
-        # Resumo visual — variáveis pré-calculadas para evitar expressões complexas no f-string
+        # Resumo visual
         _val_aluguel = st.session_state.get("valor_aluguel", 0) or 0
-        _val_fmt = f"R$ {_val_aluguel:_.2f}".replace("_", ".").replace(".", ",", 1)
+        try:
+            _val_fmt = f"R$ {float(_val_aluguel):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        except Exception:
+            _val_fmt = "R$ 0,00"
         _docs_loc  = st.session_state.get("upload_locador")  or st.session_state.get("_bytes_upload_locador")
         _docs_loct = st.session_state.get("upload_locatario") or st.session_state.get("_bytes_upload_locatario")
         _docs_fiad = st.session_state.get("upload_fiador")   or st.session_state.get("_bytes_upload_fiador")
-        _n_loc  = len(_docs_loc  or [])
-        _n_loct = len(_docs_loct or [])
-        _n_fiad = len(_docs_fiad or [])
-        _n_fotos = len(st.session_state.get("fotos_imovel", []))
-        _lok  = f"✅ {_n_loc} doc(s)"  if _docs_loc  else "❌ Sem docs"
-        _lokt = f"✅ {_n_loct} doc(s)" if _docs_loct else "❌ Sem docs"
-        _fok  = f"✅ {_n_fiad} doc(s)" if _docs_fiad else "❌ Sem docs"
-        _tipo_txt = "🏠 Residencial" if finalidade == "Residencial" else "🏢 Comercial"
+        _lok   = f"✅ {len(_docs_loc or [])} doc(s)"  if _docs_loc  else "❌ Sem docs"
+        _lokt  = f"✅ {len(_docs_loct or [])} doc(s)" if _docs_loct else "❌ Sem docs"
+        _fok   = f"✅ {len(_docs_fiad or [])} doc(s)" if _docs_fiad else "❌ Sem docs"
+        _tipo_txt     = "🏠 Residencial" if finalidade == "Residencial" else "🏢 Comercial"
         _garantia_txt = labels_garantia.get(garantia, garantia)
-        _fotos_txt = f"📷 {_n_fotos}" if _n_fotos else "Sem fotos"
+        _fotos_txt    = f"📷 {len(st.session_state.get('fotos_imovel', []))}" if st.session_state.get("fotos_imovel") else "Sem fotos"
         _fiador_bloco = f"<div><span style='color:#6B7280'>Fiador</span><br><strong>{_fok}</strong></div>" if tem_fiador else ""
-        st.markdown(f"""
-        <div style='background:#F8FAFF;border:1px solid #DBEAFE;border-radius:12px;
-                    padding:16px 20px;margin-bottom:16px;font-size:13px;'>
-            <div style='display:flex;gap:24px;flex-wrap:wrap;'>
-                <div><span style='color:#6B7280'>Tipo</span><br><strong>{_tipo_txt}</strong></div>
-                <div><span style='color:#6B7280'>Garantia</span><br><strong>{_garantia_txt}</strong></div>
-                <div><span style='color:#6B7280'>Locador</span><br><strong>{_lok}</strong></div>
-                <div><span style='color:#6B7280'>Locatário</span><br><strong>{_lokt}</strong></div>
-                {_fiador_bloco}
-                <div><span style='color:#6B7280'>Aluguel</span><br><strong>{_val_fmt}</strong></div>
-                <div><span style='color:#6B7280'>Fotos</span><br><strong>{_fotos_txt}</strong></div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        _html_resumo = (
+            "<div style='background:#F8FAFF;border:1px solid #DBEAFE;border-radius:12px;"
+            "padding:16px 20px;margin-bottom:16px;font-size:13px;'>"
+            "<div style='display:flex;gap:24px;flex-wrap:wrap;'>"
+            f"<div><span style='color:#6B7280'>Tipo</span><br><strong>{_tipo_txt}</strong></div>"
+            f"<div><span style='color:#6B7280'>Garantia</span><br><strong>{_garantia_txt}</strong></div>"
+            f"<div><span style='color:#6B7280'>Locador</span><br><strong>{_lok}</strong></div>"
+            f"<div><span style='color:#6B7280'>Locatário</span><br><strong>{_lokt}</strong></div>"
+            f"{_fiador_bloco}"
+            f"<div><span style='color:#6B7280'>Aluguel</span><br><strong>{_val_fmt}</strong></div>"
+            f"<div><span style='color:#6B7280'>Fotos</span><br><strong>{_fotos_txt}</strong></div>"
+            "</div></div>"
+        )
+        st.markdown(_html_resumo, unsafe_allow_html=True)
 
         # Sincronizar tem_fiador_check com o sistema atual
         st.session_state["tem_fiador_check"] = tem_fiador
