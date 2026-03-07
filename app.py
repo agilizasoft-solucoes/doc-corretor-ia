@@ -2971,28 +2971,8 @@ elif tipo_atendimento == "locacao":
           "atividade_permitida": ativ_c, "cnae": cnae_c, "descricao": desc_c,
       })
 
-  # — Seção de Fotos / Vistoria —
-  with st.container(border=True):
-      st.markdown("""
-      <div style='display:flex;align-items:center;gap:10px;margin-bottom:4px;'>
-          <span style='background:#2E7D32;color:white;font-size:12px;font-weight:700;
-              padding:3px 10px;border-radius:20px;'>07</span>
-          <span style='font-size:15px;font-weight:700;color:#1A1A2E;'>📷 Fotos e vistoria <span style='font-weight:400;color:#5C6B7A;font-size:13px;'>(opcional)</span></span>
-      </div>
-      <div style='font-size:12px;color:#5C6B7A;margin-bottom:8px;'>
-          Anexe fotos do imóvel — a IA descreve o estado de conservação com linguagem neutra
-      </div>
-      """, unsafe_allow_html=True)
-      fotos_upload = st.file_uploader(
-          "Arraste ou clique para selecionar as fotos do imóvel",
-          accept_multiple_files=True,
-          type=["jpg","jpeg","png","webp","bmp"],
-          key="fotos_imovel"
-      )
-      if fotos_upload:
-          st.caption(f"📷 {len(fotos_upload)} foto(s) selecionada(s) — o Termo de Vistoria será gerado automaticamente")
-
-  imovel_dados["fotos"] = len(fotos_upload) if fotos_upload else 0
+  fotos_upload = []
+  imovel_dados["fotos"] = 0
 
   # ── BLOCO 08 — Condições Financeiras ──
   st.markdown("""
@@ -3330,17 +3310,8 @@ elif tipo_atendimento == "locacao":
         st.session_state["fotos_nomes_loc"]     = fotos_nomes
         st.session_state["processado_loc"]      = True
 
-        # ── Score de risco (calcula em background, salva no session_state) ──
-        cliente_sess = st.session_state.get("cliente")
-        is_pro_score = cliente_sess.get("plano","free") in ("mensal","semestral","anual") if cliente_sess else False
-        if is_pro_score:
-            with st.spinner("📊 Calculando score de risco..."):
-                _score = calcular_score_risco(dados_locatario_ext, dados_fiador_ext if bytes_fiador else None, imovel_dados)
-                st.session_state["score_risco_loc"] = _score
-        else:
-            st.session_state["score_risco_loc"] = None
-
         # ── Registrar no histórico ──
+        cliente_sess = st.session_state.get("cliente")
         if cliente_sess:
             total_arqs = len(bytes_locador) + len(bytes_locatario) + len(bytes_fiador)
             registrar_uso(cliente_sess, qtd_arquivos=total_arqs)
@@ -3372,113 +3343,13 @@ elif tipo_atendimento == "locacao":
 
     st.divider()
 
-    # ── Score de Risco (Plano Pro) ──
-    _score_loc     = st.session_state.get("score_risco_loc")
-    _cliente_score = st.session_state.get("cliente", {})
-    _is_pro_score  = _cliente_score.get("plano","free") in ("mensal","semestral","anual")
-
-    if _is_pro_score:
-        if _score_loc:
-            _nivel = _score_loc.get("nivel","")
-            _cor   = {"BAIXO":"#2E7D32","MÉDIO":"#E65100","ALTO":"#C62828"}.get(_nivel,"#555")
-            _bg    = {"BAIXO":"#E8F5E9","MÉDIO":"#FFF3E0","ALTO":"#FFEBEE"}.get(_nivel,"#F5F5F5")
-            _icon  = {"BAIXO":"✅","MÉDIO":"⚠️","ALTO":"🔴"}.get(_nivel,"📊")
-            _sc    = _score_loc.get("score","?")
-            _comp  = _score_loc.get("comprometimento_renda","?")
-            st.markdown(
-                f"<div style='background:{_bg};border:1px solid {_cor};border-radius:10px;"
-                f"padding:14px 18px;margin-bottom:8px;'>"
-                f"<div style='font-size:13px;font-weight:700;color:#1A1A2E;margin-bottom:6px;'>"
-                f"📊 Score de Risco do Locatário &nbsp;"
-                f"<span style='background:#1565C0;color:white;font-size:10px;"
-                f"padding:2px 8px;border-radius:10px;'>PRO</span></div>"
-                f"<div style='font-size:22px;font-weight:800;color:{_cor};'>"
-                f"{_icon} {_nivel} &nbsp;"
-                f"<span style='font-size:14px;font-weight:600;color:#555;'>Score {_sc}/100</span></div>"
-                f"<div style='font-size:12px;color:#5C6B7A;margin-top:4px;'>"
-                f"Comprometimento de renda: <b>{_comp}</b></div></div>",
-                unsafe_allow_html=True)
-            with st.expander("📋 Ver detalhes do score", expanded=False):
-                if _score_loc.get("pontos_positivos"):
-                    st.markdown("**✅ Pontos positivos:**")
-                    for _pt in _score_loc["pontos_positivos"]:
-                        st.markdown(f"<span style='color:#2E7D32;'>• {_pt}</span>", unsafe_allow_html=True)
-                if _score_loc.get("pontos_atencao"):
-                    st.markdown("**⚠️ Pontos de atenção:**")
-                    for _pt in _score_loc["pontos_atencao"]:
-                        st.markdown(f"<span style='color:#E65100;'>• {_pt}</span>", unsafe_allow_html=True)
-                if _score_loc.get("recomendacao"):
-                    st.markdown(f"**💡 Recomendação:** {_score_loc['recomendacao']}")
-        else:
-            st.info("📊 Score de risco não disponível — reprocesse para calcular.")
-    else:
-        st.markdown(
-            "<div style='background:#EEF4FF;border:1px solid #BBCFEE;border-radius:10px;"
-            "padding:12px 16px;margin-bottom:8px;'>"
-            "<span style='font-size:13px;font-weight:700;color:#1A3A6B;'>"
-            "📊 Score de Risco do Locatário &nbsp;"
-            "<span style='background:#1565C0;color:white;font-size:10px;"
-            "padding:2px 8px;border-radius:10px;'>PRO</span></span><br>"
-            "<span style='font-size:12px;color:#4A6080;'>"
-            "Avaliação automática de inadimplência com base em renda, estabilidade e garantia — "
-            "disponível no plano Pro.</span></div>",
-            unsafe_allow_html=True)
-
-    st.divider()
-    checklist_loc = calcular_checklist_locacao([n for n,_ in pdfs_loc], dados_loc, imovel=imovel_loc)
-    if checklist_loc['completo']:
-        st.markdown("<div class='checklist-header-ok'>✅ Documentação completa — pronta para envio</div>", unsafe_allow_html=True)
-    else:
-        qtd_f = len(checklist_loc['faltando'])
-        st.markdown(f"<div class='checklist-header-warn'>⚠️ {qtd_f} item(s) pendente(s) — revise antes de enviar</div>", unsafe_allow_html=True)
-    with st.expander("Ver checklist completo", expanded=True):
-        if checklist_loc['ok']:
-            st.markdown("<div style='font-size:12px;font-weight:700;color:#5C6B7A;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;'>Documentos presentes</div>", unsafe_allow_html=True)
-            for i in checklist_loc['ok']:
-                st.markdown(f"<span class='checklist-ok'>{i}</span>", unsafe_allow_html=True)
-        if checklist_loc['faltando']:
-            st.markdown("<div style='font-size:12px;font-weight:700;color:#5C6B7A;text-transform:uppercase;letter-spacing:0.5px;margin:12px 0 6px 0;'>Pendências</div>", unsafe_allow_html=True)
-            for i in checklist_loc['faltando']:
-                cor = "checklist-aviso" if "⚠️" in i else "checklist-falta"
-                st.markdown(f"<span class='{cor}'>{i}</span>", unsafe_allow_html=True)
-
-    # — Resumo por polo jurídico —
-    dados_locador_r   = st.session_state.get("dados_locador", {})
-    dados_locatario_r = st.session_state.get("dados_locatario", {})
-    dados_fiador_r    = st.session_state.get("dados_fiador", {})
-
-    with st.expander("👥 Dados extraídos por polo jurídico", expanded=False):
-        col_l, col_lt = st.columns(2)
-        with col_l:
-            st.markdown("**🏠 LOCADOR**")
-            ok_l, falta_l = mini_checklist_polo(dados_locador_r, "locador")
-            for i in ok_l:   st.markdown(f"<span style='color:#2E7D32;font-size:12px;'>{i}</span>", unsafe_allow_html=True)
-            for i in falta_l: st.markdown(f"<span style='color:#C62828;font-size:12px;'>{i}</span>", unsafe_allow_html=True)
-        with col_lt:
-            st.markdown("**🔑 LOCATÁRIO**")
-            ok_lt, falta_lt = mini_checklist_polo(dados_locatario_r, "locatario")
-            for i in ok_lt:   st.markdown(f"<span style='color:#2E7D32;font-size:12px;'>{i}</span>", unsafe_allow_html=True)
-            for i in falta_lt: st.markdown(f"<span style='color:#C62828;font-size:12px;'>{i}</span>", unsafe_allow_html=True)
-        if dados_fiador_r:
-            st.markdown("**🤝 FIADOR**")
-            ok_f, falta_f = mini_checklist_polo(dados_fiador_r, "fiador")
-            for i in ok_f:   st.markdown(f"<span style='color:#2E7D32;font-size:12px;'>{i}</span>", unsafe_allow_html=True)
-            for i in falta_f: st.markdown(f"<span style='color:#C62828;font-size:12px;'>{i}</span>", unsafe_allow_html=True)
-
-    # — Debug diagnóstico (temporário) —
-    st.divider()
-    st.markdown("""
-    <div class='card-section-neutral'>
-        <p class='section-title'>✅ Documentação organizada e pronta</p>
-        <p class='section-subtitle'>Baixe por polo ou tudo de uma vez — o ZIP completo já vem com pastas separadas</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Recuperar PDFs por polo
+    # ── Monta lista de selecionados para envio ──
     pdfs_polo_locador   = st.session_state.get("pdfs_polo_locador",   [])
     pdfs_polo_locatario = st.session_state.get("pdfs_polo_locatario", [])
     pdfs_polo_fiador    = st.session_state.get("pdfs_polo_fiador",    [])
+    selecionados_loc = pdfs_polo_locador + pdfs_polo_locatario + pdfs_polo_fiador
 
+    # ── ZIP completo para download ──
     def _fazer_zip(lista_pdfs, pasta="", extras=None):
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w") as zf:
@@ -3490,267 +3361,19 @@ elif tipo_atendimento == "locacao":
         buf.seek(0)
         return buf
 
-    # ── Arquivos por polo com checkbox de seleção para envio ──
     tem_fiador_ativo = st.session_state.get("tem_fiador_check", False)
-    selecionados_loc = []
-
-    def _bloco_polo(label, cor, pdfs_lista, prefixo_key):
-        st.markdown(
-            f"<div style='font-size:12px;font-weight:700;color:{cor};"
-            f"margin-bottom:4px;'>{label}</div>",
-            unsafe_allow_html=True)
-        for idx, (nome, conteudo) in enumerate(pdfs_lista):
-            marcado = st.checkbox(
-                f"📄 {nome}", value=True,
-                key=f"sel_{prefixo_key}_{idx}")
-            if marcado:
-                selecionados_loc.append((nome, conteudo))
-        if pdfs_lista:
-            zip_b = _fazer_zip(pdfs_lista)
-            st.download_button(
-                f"⬇️ ZIP {label.split()[-1]}",
-                data=zip_b,
-                file_name=f"Documentos_{prefixo_key}.zip",
-                mime="application/zip",
-                use_container_width=True,
-                key=f"zip_{prefixo_key}")
-        else:
-            st.caption("Nenhum arquivo")
-
-    colunas_polo = [1, 1, 1] if tem_fiador_ativo else [1, 1]
-    cols_polo = st.columns(colunas_polo)
-    with cols_polo[0]:
-        _bloco_polo("🏠 LOCADOR",   "#1565C0", pdfs_polo_locador,   "locador")
-    with cols_polo[1]:
-        _bloco_polo("🔑 LOCATÁRIO", "#2E7D32", pdfs_polo_locatario, "locatario")
-    if tem_fiador_ativo:
-        with cols_polo[2]:
-            _bloco_polo("🤝 FIADOR", "#E65100", pdfs_polo_fiador,   "fiador")
-
-    # ── ZIP completo ──
-    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-    extras_completo = [("Vistoria/Termo_Vistoria_Inicial.pdf", termo_vis_bytes)] if termo_vis_bytes else []
     lista_zip_completo = (
         [(f"Locador/{n}",   c) for n,c in pdfs_polo_locador] +
         [(f"Locatario/{n}", c) for n,c in pdfs_polo_locatario] +
         ([(f"Fiador/{n}",   c) for n,c in pdfs_polo_fiador] if tem_fiador_ativo else [])
     )
-    zip_completo = _fazer_zip(lista_zip_completo, extras=extras_completo)
-    st.markdown("""
-    <div style='background:#F5F5F5;border:1px solid #DEDEDE;border-radius:10px;padding:14px 18px;margin:6px 0;'>
-        <span style='font-weight:600;color:#333;font-size:0.95rem;'>📦 Download completo</span>
-        <span style='font-size:0.82rem;color:#777;margin-left:8px;'>— ZIP com pastas separadas por polo</span>
-    </div>
-    """, unsafe_allow_html=True)
+    zip_completo = _fazer_zip(lista_zip_completo)
+    st.divider()
     st.download_button(
         "⬇️ Baixar TODA a documentação em ZIP",
         data=zip_completo, file_name="Documentacao_Completa_Locacao.zip",
         mime="application/zip", use_container_width=True, key="zip_completo_loc")
 
-    # — Termo de Vistoria —
-    if termo_vis_bytes:
-        st.markdown("""
-        <div style='background:#F0F7FF;border:1px solid #C5DCF5;border-radius:10px;padding:14px 18px;margin:10px 0 4px 0;'>
-            <span style='font-weight:600;color:#1565C0;font-size:0.95rem;'>📋 Termo de Vistoria Inicial</span>
-            {}
-        </div>
-        """.format(f"<span style='font-size:0.82rem;color:#555;margin-left:10px;'>📷 {len(fotos_nomes_loc)} foto(s) anexada(s)</span>" if fotos_nomes_loc else ""), unsafe_allow_html=True)
-        col_vis_dl, col_vis_cb = st.columns([1, 1])
-        with col_vis_dl:
-            st.download_button("⬇️ Baixar Termo de Vistoria (PDF)", data=termo_vis_bytes,
-                               file_name="Termo_Vistoria_Inicial.pdf", mime="application/pdf",
-                               use_container_width=True, key="dl_vistoria")
-        with col_vis_cb:
-            incluir_vistoria_email = st.checkbox("📧 Incluir no email ao destinatário", value=True, key="sel_vistoria_email")
-        if incluir_vistoria_email:
-            selecionados_loc.append(("Termo_Vistoria_Inicial.pdf", termo_vis_bytes))
-    else:
-        incluir_vistoria_email = False
-
-    # — Gerar Contrato com Revisão —
-    st.divider()
-    st.markdown("""
-    <div class='card-section-neutral'>
-        <p class='section-title'>📄 Contrato de Locação</p>
-        <p class='section-subtitle'>Revise e edite os dados antes de gerar o PDF</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    imovel_loc_atual = st.session_state.get("imovel_loc", {})
-    valor_cont = imovel_loc_atual.get("valor_aluguel", 0)
-    if not valor_cont or float(valor_cont) == 0:
-        st.warning("⚠️ Informe o valor do aluguel no Bloco 08 antes de gerar o contrato.")
-    else:
-        # Botão para abrir o formulário de revisão
-        if st.button("📝  REVISAR E EDITAR DADOS DO CONTRATO", type="primary", use_container_width=True, key="btn_revisar_contrato"):
-            st.session_state["revisao_aberta"] = True
-            st.session_state["contrato_gerado"] = None  # limpa PDF anterior
-
-        if st.session_state.get("revisao_aberta"):
-            st.markdown("<div style='background:#EEF4FF;border:1px solid #BBCFEE;border-radius:10px;padding:18px 22px;margin:12px 0;'>", unsafe_allow_html=True)
-            st.markdown("#### ✏️ Revise os dados — edite o que precisar antes de gerar o PDF")
-
-            d_loc   = st.session_state.get("dados_locador",   {})
-            d_locat = st.session_state.get("dados_locatario", {})
-            d_fiad  = st.session_state.get("dados_fiador",    {})
-            d_imovel = st.session_state.get("imovel_loc",     {})
-
-            st.markdown("---")
-            st.markdown("**🏠 LOCADOR (Proprietário)**")
-            col1, col2 = st.columns(2)
-            with col1:
-                r_loc_nome   = st.text_input("Nome completo",    value=d_loc.get("nome_completo",""), key="r_loc_nome")
-                r_loc_cpf    = st.text_input("CPF",              value=d_loc.get("cpf",""),           key="r_loc_cpf")
-                r_loc_rg     = st.text_input("RG",               value=d_loc.get("rg",""),            key="r_loc_rg")
-                r_loc_orgao  = st.text_input("Órgão expedidor",  value=d_loc.get("orgao_expedidor",""),key="r_loc_orgao")
-            with col2:
-                r_loc_eciv   = st.text_input("Estado civil",     value=d_loc.get("estado_civil",""),  key="r_loc_eciv")
-                r_loc_prof   = st.text_input("Profissão",        value=d_loc.get("profissao",""),     key="r_loc_prof")
-                r_loc_tel    = st.text_input("Telefone",         value=d_loc.get("telefone",""),      key="r_loc_tel")
-                r_loc_email  = st.text_input("E-mail",           value=d_loc.get("email",""),         key="r_loc_email")
-            r_loc_end = st.text_input("Endereço completo", value=d_loc.get("endereco",""), key="r_loc_end")
-
-            st.markdown("---")
-            st.markdown("**🔑 LOCATÁRIO (Inquilino)**")
-            col1, col2 = st.columns(2)
-            with col1:
-                r_locat_nome  = st.text_input("Nome completo",   value=d_locat.get("nome_completo",""), key="r_locat_nome")
-                r_locat_cpf   = st.text_input("CPF",             value=d_locat.get("cpf",""),           key="r_locat_cpf")
-                r_locat_rg    = st.text_input("RG",              value=d_locat.get("rg",""),            key="r_locat_rg")
-                r_locat_orgao = st.text_input("Órgão expedidor", value=d_locat.get("orgao_expedidor",""),key="r_locat_orgao")
-            with col2:
-                r_locat_eciv  = st.text_input("Estado civil",    value=d_locat.get("estado_civil",""),  key="r_locat_eciv")
-                r_locat_prof  = st.text_input("Profissão",       value=d_locat.get("profissao",""),     key="r_locat_prof")
-                r_locat_tel   = st.text_input("Telefone",        value=d_locat.get("telefone",""),      key="r_locat_tel")
-                r_locat_email = st.text_input("E-mail",          value=d_locat.get("email",""),         key="r_locat_email")
-            r_locat_end = st.text_input("Endereço completo", value=d_locat.get("endereco",""), key="r_locat_end")
-
-            if d_fiad and d_fiad.get("nome_completo"):
-                st.markdown("---")
-                st.markdown("**🤝 FIADOR**")
-                col1, col2 = st.columns(2)
-                with col1:
-                    r_fiad_nome  = st.text_input("Nome completo",   value=d_fiad.get("nome_completo",""), key="r_fiad_nome")
-                    r_fiad_cpf   = st.text_input("CPF",             value=d_fiad.get("cpf",""),           key="r_fiad_cpf")
-                    r_fiad_rg    = st.text_input("RG",              value=d_fiad.get("rg",""),            key="r_fiad_rg")
-                    r_fiad_orgao = st.text_input("Órgão expedidor", value=d_fiad.get("orgao_expedidor",""),key="r_fiad_orgao")
-                with col2:
-                    r_fiad_eciv  = st.text_input("Estado civil",    value=d_fiad.get("estado_civil",""),  key="r_fiad_eciv")
-                    r_fiad_prof  = st.text_input("Profissão",       value=d_fiad.get("profissao",""),     key="r_fiad_prof")
-                    r_fiad_tel   = st.text_input("Telefone",        value=d_fiad.get("telefone",""),      key="r_fiad_tel")
-                    r_fiad_email = st.text_input("E-mail",          value=d_fiad.get("email",""),         key="r_fiad_email")
-                r_fiad_end = st.text_input("Endereço completo", value=d_fiad.get("endereco",""), key="r_fiad_end")
-            else:
-                r_fiad_nome=r_fiad_cpf=r_fiad_rg=r_fiad_orgao=r_fiad_eciv=r_fiad_prof=r_fiad_tel=r_fiad_email=r_fiad_end=""
-
-            st.markdown("---")
-            st.markdown("**🏡 IMÓVEL E CONDIÇÕES FINANCEIRAS**")
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                r_tipo_imovel = st.text_input("Tipo do imóvel",  value=d_imovel.get("tipo_imovel","Casa"),  key="r_tipo_imovel")
-                r_area        = st.text_input("Área (m²)",       value=str(d_imovel.get("area","")),        key="r_area")
-                r_matricula   = st.text_input("Matrícula",       value=d_imovel.get("matricula",""),        key="r_matricula")
-            with col2:
-                r_valor       = st.text_input("Valor do aluguel (R$)", value=str(d_imovel.get("valor_aluguel","")), key="r_valor")
-                r_dia_venc    = st.text_input("Dia de vencimento",     value=str(d_imovel.get("dia_vencimento",5)), key="r_dia_venc")
-                r_forma_pag   = st.text_input("Forma de pagamento",    value=d_imovel.get("forma_pagamento",""),    key="r_forma_pag")
-            with col3:
-                r_duracao     = st.text_input("Duração do contrato",   value=d_imovel.get("duracao_contrato","12 meses"), key="r_duracao")
-                r_data_inicio = st.text_input("Data de início",        value=str(d_imovel.get("data_inicio","")),         key="r_data_inicio")
-                r_finalidade  = st.text_input("Finalidade",            value=d_imovel.get("finalidade","Residencial"),    key="r_finalidade")
-
-            col_cidade, col_uf = st.columns([3,1])
-            with col_cidade:
-                r_cidade = st.text_input("🏙️ Cidade do imóvel (foro contratual)",
-                    value=d_imovel.get("cidade",""),
-                    placeholder="Ex: Caruaru — extraída automaticamente dos documentos",
-                    key="r_cidade_imovel")
-            with col_uf:
-                r_uf = st.text_input("UF", value=d_imovel.get("uf","PE"), placeholder="PE", key="r_uf_imovel")
-            if not d_imovel.get("cidade"):
-                st.caption("💡 Cidade será preenchida automaticamente ao processar os documentos do Locador.")
-
-            st.markdown("</div>", unsafe_allow_html=True)
-            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-
-            if st.button("📄  GERAR CONTRATO COM DADOS REVISADOS", type="primary", use_container_width=True, key="btn_gerar_contrato"):
-                # Monta dicts atualizados com o que o usuário editou
-                dados_loc_rev = {
-                    "nome_completo": r_loc_nome,  "cpf": r_loc_cpf,
-                    "rg": r_loc_rg,               "orgao_expedidor": r_loc_orgao,
-                    "estado_civil": r_loc_eciv,   "profissao": r_loc_prof,
-                    "endereco": r_loc_end,         "telefone": r_loc_tel,
-                    "email": r_loc_email,
-                }
-                dados_locat_rev = {
-                    "nome_completo": r_locat_nome, "cpf": r_locat_cpf,
-                    "rg": r_locat_rg,              "orgao_expedidor": r_locat_orgao,
-                    "estado_civil": r_locat_eciv,  "profissao": r_locat_prof,
-                    "endereco": r_locat_end,        "telefone": r_locat_tel,
-                    "email": r_locat_email,
-                }
-                dados_fiad_rev = {
-                    "nome_completo": r_fiad_nome,  "cpf": r_fiad_cpf,
-                    "rg": r_fiad_rg,               "orgao_expedidor": r_fiad_orgao,
-                    "estado_civil": r_fiad_eciv,   "profissao": r_fiad_prof,
-                    "endereco": r_fiad_end,         "telefone": r_fiad_tel,
-                    "email": r_fiad_email,
-                } if r_fiad_nome else {}
-                imovel_rev = dict(d_imovel)
-                imovel_rev.update({
-                    "tipo_imovel":       r_tipo_imovel,
-                    "area":              r_area,
-                    "matricula":         r_matricula,
-                    "valor_aluguel":     r_valor,
-                    "dia_vencimento":    r_dia_venc,
-                    "forma_pagamento":   r_forma_pag,
-                    "duracao_contrato":  r_duracao,
-                    "data_inicio":       r_data_inicio,
-                    "finalidade":        r_finalidade,
-                    "cidade":            r_cidade,
-                    "uf":                r_uf,
-                })
-                # Salva os dados revisados no session_state para uso posterior (email etc.)
-                st.session_state["dados_locador"]   = dados_loc_rev
-                st.session_state["dados_locatario"] = dados_locat_rev
-                st.session_state["dados_fiador"]    = dados_fiad_rev
-                st.session_state["imovel_loc"]      = imovel_rev
-
-                with st.spinner("⚙️ Gerando contrato..."):
-                    clausula_r    = st.session_state.get("clausula_loc", "")
-                    interm_r      = imovel_rev.get("intermediacao", st.session_state.get("imovel_loc",{}).get("intermediacao",{}))
-                    contrato_bytes = gerar_contrato_pdf(
-                        dados_loc_rev, dados_locat_rev, dados_fiad_rev,
-                        imovel_rev, clausula_r, intermediacao=interm_r
-                    )
-                    st.session_state["contrato_gerado"] = contrato_bytes
-                    # Atualizar histórico: contrato gerado
-                    _cli_upd = st.session_state.get("cliente",{})
-                    _hem = st.session_state.get("hist_criado_em","")
-                    if _cli_upd.get("id") and _hem:
-                        atualizar_historico(_cli_upd["id"], _hem, contrato_gerado=True, status="Contrato Gerado")
-                st.success("✅ Contrato gerado com os dados revisados!")
-                st.session_state["revisao_aberta"] = False
-                st.rerun()
-
-    if st.session_state.get("contrato_gerado"):
-        st.download_button(
-            "⬇️ Baixar Contrato de Locação (PDF)",
-            data=st.session_state["contrato_gerado"],
-            file_name="Contrato_Locacao.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-            key="dl_contrato"
-        )
-        st.success("✅ Contrato pronto! Revise antes de assinar.")
-
-
-        if st.button("✏️ Editar dados novamente", use_container_width=True, key="btn_reeditar"):
-            st.session_state["revisao_aberta"] = True
-            st.session_state["contrato_gerado"] = None
-            st.rerun()
-
-    st.divider()
     st.markdown("""
     <div class='card-section-neutral'>
         <p class='section-title'>✉️ Email profissional gerado automaticamente</p>
