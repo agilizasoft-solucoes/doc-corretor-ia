@@ -3070,7 +3070,7 @@ if _modo_interface == "quiz" and tipo_atendimento == "locacao":
         })
         st.session_state["quiz_imovel_dados"] = _imovel_quiz
         st.session_state["quiz_iniciar_processamento"] = False
-        # Não chama st.stop() — o bloco elif tipo_atendimento == "locacao" vai rodar
+        st.rerun()  # força novo ciclo onde _vindo_do_quiz=True e processa normalmente
     else:
         # Quiz normal — mostra etapas e para
         executar_modo_quiz()
@@ -3331,11 +3331,13 @@ elif tipo_atendimento == "locacao":
           def seek(self, n): pass
 
       def _restaurar_uploads(chave):
-          widget = st.session_state.get(chave) or []
-          if widget:
-              return widget
+          # Prioriza bytes salvos (persistentes) sobre widget (volátil entre reruns)
           salvos = st.session_state.get(f"_bytes_{chave}", [])
-          return [_FakeFile(s["name"], s["bytes"]) for s in salvos]
+          if salvos:
+              return [_FakeFile(s["name"], s["bytes"]) for s in salvos]
+          # Fallback: widget ainda ativo
+          widget = st.session_state.get(chave) or []
+          return widget
 
       tem_fiador        = st.session_state.get("quiz_tem_fiador", False)
       upload_locador    = _restaurar_uploads("upload_locador")
@@ -3787,7 +3789,8 @@ elif tipo_atendimento == "locacao":
         erros_bloqueio.append("📂 Envie os documentos do **LOCATÁRIO** (Bloco 02)")
     if tem_fiador and not upload_fiador:
         erros_bloqueio.append("📂 Garantia = Fiador: envie os documentos do **FIADOR** (Bloco 03)")
-    if finalidade_imovel and not imovel_dados.get("area"):
+    # Área só é obrigatória no modo painel — no quiz é opcional
+    if not _vindo_do_quiz and finalidade_imovel and not imovel_dados.get("area"):
         erros_bloqueio.append("📐 Informe a **área do imóvel** (obrigatória para a cláusula contratual)")
 
     if erros_bloqueio:
