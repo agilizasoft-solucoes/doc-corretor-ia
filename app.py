@@ -2639,7 +2639,7 @@ def _salvar_bytes_uploads():
             for arq in arquivos:
                 try:
                     conteudo = arq.read()
-                    arq.seek(0)  # rebobina para poder ser lido de novo
+                    arq.seek(0)
                     salvos.append({"name": arq.name, "bytes": conteudo})
                 except Exception:
                     pass
@@ -2677,10 +2677,6 @@ def quiz_etapa_4():
                 label_visibility="collapsed",
                 on_change=_salvar_bytes_uploads
             )
-            # Mostrar contagem de bytes salvos se já houver
-            _bytes_loc = st.session_state.get("_bytes_upload_locador", [])
-            if _bytes_loc and not st.session_state.get("upload_locador"):
-                st.caption(f"✅ {len(_bytes_loc)} arquivo(s) salvo(s)")
             col_e, col_t = st.columns(2)
             with col_e: st.text_input("📧 E-mail do Locador", placeholder="locador@email.com", key="email_manual_locador")
             with col_t: st.text_input("📱 WhatsApp/Tel", placeholder="(81) 99999-0000", key="tel_manual_locador")
@@ -2705,9 +2701,6 @@ def quiz_etapa_4():
                 label_visibility="collapsed",
                 on_change=_salvar_bytes_uploads
             )
-            _bytes_loct = st.session_state.get("_bytes_upload_locatario", [])
-            if _bytes_loct and not st.session_state.get("upload_locatario"):
-                st.caption(f"✅ {len(_bytes_loct)} arquivo(s) salvo(s)")
             col_e2, col_t2 = st.columns(2)
             with col_e2: st.text_input("📧 E-mail do Locatário", placeholder="locatario@email.com", key="email_manual_locatario")
             with col_t2: st.text_input("📱 WhatsApp/Tel", placeholder="(81) 99999-0000", key="tel_manual_locatario")
@@ -2733,18 +2726,19 @@ def quiz_etapa_4():
                     label_visibility="collapsed",
                     on_change=_salvar_bytes_uploads
                 )
-                _bytes_fiad = st.session_state.get("_bytes_upload_fiador", [])
-                if _bytes_fiad and not st.session_state.get("upload_fiador"):
-                    st.caption(f"✅ {len(_bytes_fiad)} arquivo(s) salvo(s)")
                 col_e3, col_t3 = st.columns(2)
                 with col_e3: st.text_input("📧 E-mail do Fiador", placeholder="fiador@email.com", key="email_manual_fiador")
                 with col_t3: st.text_input("📱 WhatsApp/Tel", placeholder="(81) 99999-0000", key="tel_manual_fiador")
 
-        # Validação — considera tanto widgets ativos quanto bytes salvos
+        # Validação antes de avançar
+        upload_loc  = st.session_state.get("upload_locador",  [])
+        upload_loct = st.session_state.get("upload_locatario", [])
+        upload_fiad = st.session_state.get("upload_fiador",   [])
+
         tudo_ok = (
-            bool(st.session_state.get("upload_locador") or st.session_state.get("_bytes_upload_locador"))
-            and bool(st.session_state.get("upload_locatario") or st.session_state.get("_bytes_upload_locatario"))
-            and (not tem_fiador_quiz or bool(st.session_state.get("upload_fiador") or st.session_state.get("_bytes_upload_fiador")))
+            bool(st.session_state.get("upload_locador"))
+            and bool(st.session_state.get("upload_locatario"))
+            and (not tem_fiador_quiz or bool(st.session_state.get("upload_fiador")))
         )
 
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
@@ -2756,7 +2750,7 @@ def quiz_etapa_4():
             disabled=not tudo_ok
         )
         if btn_prox:
-            _salvar_bytes_uploads()  # persiste antes do rerun apagar os widgets
+            _salvar_bytes_uploads()
             st.session_state["etapa_quiz"] = 5
             st.rerun()
 
@@ -2854,34 +2848,30 @@ def quiz_etapa_5():
         st.text_input("", placeholder="Ex: Imobiliária Central, Sr. João...", key="nome_dest_locacao", label_visibility="collapsed")
 
         # Intermediação imobiliária
-        st.markdown("<div style='font-size:13px;font-weight:600;color:#1A1A2E;margin:14px 0 4px 0;'>🤝 Intermediação Imobiliária <span style='font-weight:400;color:#9CA3AF;font-size:12px;'>(opcional)</span></div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size:13px;font-weight:600;color:#1A1A2E;margin:14px 0 4px 0;'>🤝 Intermediação <span style='font-weight:400;color:#9CA3AF;font-size:12px;'>(opcional)</span></div>", unsafe_allow_html=True)
         tem_interm_quiz = st.checkbox("Há corretor ou imobiliária intermediando?", key="quiz_tem_interm")
         if tem_interm_quiz:
             with st.container(border=True):
-                col_ti1, col_ti2 = st.columns(2)
-                with col_ti1: st.selectbox("Tipo", ["Corretor Autônomo","Imobiliária","Correspondente Imobiliário"], key="tipo_interm")
-                with col_ti2: st.text_input("CRECI / CNPJ", placeholder="Ex: 12345-F", key="creci_interm")
-                col_ti3, col_ti4 = st.columns(2)
-                with col_ti3: st.text_input("Nome / Razão social", placeholder="Nome completo", key="nome_interm")
-                with col_ti4: st.text_input("CPF / CNPJ", placeholder="000.000.000-00", key="cpf_cnpj_interm")
-                col_ti5, col_ti6 = st.columns(2)
-                with col_ti5: st.text_input("Telefone", placeholder="(81) 99999-0000", key="tel_interm")
-                with col_ti6: st.text_input("E-mail", placeholder="corretor@email.com", key="email_interm")
-
-                st.markdown("<div style='font-size:12px;font-weight:700;color:#1A1A2E;margin:10px 0 4px 0;'>💰 Comissão</div>", unsafe_allow_html=True)
-                col_mc, col_vc2 = st.columns(2)
-                with col_mc: st.selectbox("Modelo", ["1º aluguel integral ao intermediador","Percentual sobre o aluguel","Valor fixo"], key="modelo_comissao")
-                with col_vc2: st.text_input("Valor / %", placeholder="Ex: 100% ou R$ 1.200", key="valor_comissao_str")
-
-                tem_adm_quiz = st.checkbox("Possui taxa de administração mensal?", key="tem_adm")
-                if tem_adm_quiz:
-                    col_ta1, col_ta2 = st.columns(2)
-                    with col_ta1: st.text_input("Taxa de administração", placeholder="Ex: 10% ou R$ 150", key="taxa_adm_str")
-                    with col_ta2: st.multiselect("Serviços incluídos", ["Cobrança","Repasse","Vistoria","Renovação","Jurídico"], key="servicos_adm")
-
-                col_vig, col_av = st.columns(2)
-                with col_vig: st.text_input("Vigência", placeholder="Mesma do contrato", key="vigencia_interm")
-                with col_av:  st.text_input("Aviso prévio rescisão", placeholder="30 dias", key="aviso_interm")
+                _ci1, _ci2 = st.columns(2)
+                with _ci1: st.selectbox("Tipo", ["Corretor Autônomo","Imobiliária","Correspondente Imobiliário"], key="tipo_interm")
+                with _ci2: st.text_input("CRECI / CNPJ", placeholder="Ex: 12345-F", key="creci_interm")
+                _ci3, _ci4 = st.columns(2)
+                with _ci3: st.text_input("Nome / Razão social", placeholder="Nome completo", key="nome_interm")
+                with _ci4: st.text_input("CPF / CNPJ", placeholder="000.000.000-00", key="cpf_cnpj_interm")
+                _ci5, _ci6 = st.columns(2)
+                with _ci5: st.text_input("Telefone", placeholder="(81) 99999-0000", key="tel_interm")
+                with _ci6: st.text_input("E-mail", placeholder="corretor@email.com", key="email_interm")
+                _ci7, _ci8 = st.columns(2)
+                with _ci7: st.selectbox("Modelo comissão", ["1º aluguel integral","Percentual","Valor fixo"], key="modelo_comissao")
+                with _ci8: st.text_input("Valor / %", placeholder="Ex: 100% ou R$ 1.200", key="valor_comissao_str")
+                tem_adm_q = st.checkbox("Possui taxa de administração mensal?", key="tem_adm")
+                if tem_adm_q:
+                    _ca1, _ca2 = st.columns(2)
+                    with _ca1: st.text_input("Taxa", placeholder="Ex: 10%", key="taxa_adm_str")
+                    with _ca2: st.multiselect("Serviços", ["Cobrança","Repasse","Vistoria","Renovação","Jurídico"], key="servicos_adm")
+                _cv1, _cv2 = st.columns(2)
+                with _cv1: st.text_input("Vigência", placeholder="Mesma do contrato", key="vigencia_interm")
+                with _cv2: st.text_input("Aviso prévio", placeholder="30 dias", key="aviso_interm")
 
         # Validação de área
         area_quiz = st.session_state.get("area_res", 0) if finalidade == "Residencial" else st.session_state.get("area_com", 0)
@@ -2922,35 +2912,34 @@ def quiz_etapa_6():
         )
 
         # Resumo visual
-        _val_aluguel = st.session_state.get("valor_aluguel", 0) or 0
+        _val = st.session_state.get("valor_aluguel", 0) or 0
         try:
-            _val_fmt = f"R$ {float(_val_aluguel):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            _val_fmt = f"R$ {float(_val):,.2f}".replace(",","X").replace(".",",").replace("X",".")
         except Exception:
             _val_fmt = "R$ 0,00"
         _docs_loc  = st.session_state.get("upload_locador")  or st.session_state.get("_bytes_upload_locador")
         _docs_loct = st.session_state.get("upload_locatario") or st.session_state.get("_bytes_upload_locatario")
         _docs_fiad = st.session_state.get("upload_fiador")   or st.session_state.get("_bytes_upload_fiador")
-        _lok   = f"✅ {len(_docs_loc or [])} doc(s)"  if _docs_loc  else "❌ Sem docs"
-        _lokt  = f"✅ {len(_docs_loct or [])} doc(s)" if _docs_loct else "❌ Sem docs"
-        _fok   = f"✅ {len(_docs_fiad or [])} doc(s)" if _docs_fiad else "❌ Sem docs"
-        _tipo_txt     = "🏠 Residencial" if finalidade == "Residencial" else "🏢 Comercial"
-        _garantia_txt = labels_garantia.get(garantia, garantia)
-        _fotos_txt    = f"📷 {len(st.session_state.get('fotos_imovel', []))}" if st.session_state.get("fotos_imovel") else "Sem fotos"
-        _fiador_bloco = f"<div><span style='color:#6B7280'>Fiador</span><br><strong>{_fok}</strong></div>" if tem_fiador else ""
-        _html_resumo = (
+        _lok  = f"✅ {len(_docs_loc or [])} doc(s)"  if _docs_loc  else "❌ Sem docs"
+        _lokt = f"✅ {len(_docs_loct or [])} doc(s)" if _docs_loct else "❌ Sem docs"
+        _fok  = f"✅ {len(_docs_fiad or [])} doc(s)" if _docs_fiad else "❌ Sem docs"
+        _tipo_txt = "🏠 Residencial" if finalidade == "Residencial" else "🏢 Comercial"
+        _fotos_txt = f"📷 {len(st.session_state.get('fotos_imovel',[]))}" if st.session_state.get("fotos_imovel") else "Sem fotos"
+        _fiad_html = f"<div><span style='color:#6B7280'>Fiador</span><br><strong>{_fok}</strong></div>" if tem_fiador else ""
+        _html = (
             "<div style='background:#F8FAFF;border:1px solid #DBEAFE;border-radius:12px;"
             "padding:16px 20px;margin-bottom:16px;font-size:13px;'>"
             "<div style='display:flex;gap:24px;flex-wrap:wrap;'>"
             f"<div><span style='color:#6B7280'>Tipo</span><br><strong>{_tipo_txt}</strong></div>"
-            f"<div><span style='color:#6B7280'>Garantia</span><br><strong>{_garantia_txt}</strong></div>"
+            f"<div><span style='color:#6B7280'>Garantia</span><br><strong>{labels_garantia.get(garantia, garantia)}</strong></div>"
             f"<div><span style='color:#6B7280'>Locador</span><br><strong>{_lok}</strong></div>"
             f"<div><span style='color:#6B7280'>Locatário</span><br><strong>{_lokt}</strong></div>"
-            f"{_fiador_bloco}"
+            f"{_fiad_html}"
             f"<div><span style='color:#6B7280'>Aluguel</span><br><strong>{_val_fmt}</strong></div>"
             f"<div><span style='color:#6B7280'>Fotos</span><br><strong>{_fotos_txt}</strong></div>"
             "</div></div>"
         )
-        st.markdown(_html_resumo, unsafe_allow_html=True)
+        st.markdown(_html, unsafe_allow_html=True)
 
         # Sincronizar tem_fiador_check com o sistema atual
         st.session_state["tem_fiador_check"] = tem_fiador
@@ -2978,7 +2967,6 @@ def quiz_etapa_6():
             use_container_width=True,
             key="quiz_btn_processar"
         ):
-            # Salvar bytes de todos os uploads antes do rerun (widgets somem após rerun)
             _salvar_bytes_uploads()
             st.session_state["quiz_iniciar_processamento"] = True
             st.rerun()
@@ -3013,16 +3001,39 @@ def executar_modo_quiz():
 
 tipo_atendimento = st.session_state.get("tipo_atendimento", "credito")
 
-# ── Badge do tipo de atendimento ──
-badge_cor = "#1565C0" if tipo_atendimento == "credito" else "#2E7D32"
-badge_txt = "🏠 Crédito Imobiliário" if tipo_atendimento == "credito" else "🔑 Locação"
-st.markdown(f"""
-<span style='background:{badge_cor};color:white;font-size:11px;font-weight:700;
-      padding:3px 12px;border-radius:20px;letter-spacing:0.5px;
-      display:inline-block;margin-bottom:4px;'>
-    {badge_txt}
-</span>
-""", unsafe_allow_html=True)
+# ── Seletor de modo (Painel completo vs Assistente guiado) ──
+badge_cor  = "#1565C0" if tipo_atendimento == "credito" else "#2E7D32"
+badge_txt  = "🏠 Crédito Imobiliário" if tipo_atendimento == "credito" else "🔑 Locação"
+
+_col_badge, _col_modo = st.columns([1, 2])
+with _col_badge:
+    st.markdown(f"""
+    <span style='background:{badge_cor};color:white;font-size:11px;font-weight:700;
+          padding:3px 12px;border-radius:20px;letter-spacing:0.5px;
+          display:inline-block;margin-top:6px;'>
+        {badge_txt}
+    </span>
+    """, unsafe_allow_html=True)
+
+with _col_modo:
+    _modo_atual = st.session_state.get("modo_interface", "painel")
+    _m1, _m2 = st.columns(2)
+    with _m1:
+        _class1 = "modo-btn-ativo" if _modo_atual == "painel" else "modo-btn-inativo"
+        st.markdown(f"<div class='{_class1}'>", unsafe_allow_html=True)
+        if st.button("📋 Painel completo", use_container_width=True, key="modo_painel"):
+            st.session_state["modo_interface"] = "painel"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+    with _m2:
+        _class2 = "modo-btn-ativo" if _modo_atual == "quiz" else "modo-btn-inativo"
+        st.markdown(f"<div class='{_class2}'>", unsafe_allow_html=True)
+        if st.button("🧭 Assistente guiado", use_container_width=True, key="modo_quiz"):
+            st.session_state["modo_interface"] = "quiz"
+            if "etapa_quiz" not in st.session_state:
+                st.session_state["etapa_quiz"] = 1
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
 if st.button("↩ Trocar tipo de atendimento", key="trocar_tipo", use_container_width=True):
     for key in ["tipo_atendimento","pdfs_gerados","email_gerado","processado","dados",
@@ -3108,7 +3119,7 @@ if _modo_interface == "quiz" and tipo_atendimento == "locacao":
                 "valor_comissao":  st.session_state.get("valor_comissao_str", ""),
                 "tem_adm":         st.session_state.get("tem_adm", False),
                 "taxa_adm":        st.session_state.get("taxa_adm_str", ""),
-                "servicos_adm":    st.session_state.get("servicos_adm", []) if st.session_state.get("tem_adm") else [],
+                "servicos_adm":    st.session_state.get("servicos_adm", []),
                 "vigencia":        st.session_state.get("vigencia_interm", ""),
                 "aviso_rescisao":  st.session_state.get("aviso_interm", ""),
             } if st.session_state.get("quiz_tem_interm") else {},
@@ -3117,7 +3128,6 @@ if _modo_interface == "quiz" and tipo_atendimento == "locacao":
         })
         st.session_state["quiz_imovel_dados"] = _imovel_quiz
         st.session_state["quiz_iniciar_processamento"] = False
-        # Não chama rerun — o elif locacao abaixo roda no mesmo ciclo com _vindo_do_quiz=True
     else:
         # Quiz normal — mostra etapas e para
         executar_modo_quiz()
@@ -3361,24 +3371,13 @@ if tipo_atendimento == "credito":
 # ══════════════════════════════════════════════════════
 elif tipo_atendimento == "locacao":
 
-  # ── DEBUG TEMPORÁRIO ──
-  _dbg_modo     = st.session_state.get("modo_interface", "?")
-  _dbg_dados    = st.session_state.get("quiz_imovel_dados") is not None
-  _dbg_flag     = st.session_state.get("quiz_iniciar_processamento", "NÃO EXISTE")
-  _dbg_bytes_l  = len(st.session_state.get("_bytes_upload_locador", []))
-  _dbg_bytes_lt = len(st.session_state.get("_bytes_upload_locatario", []))
-  st.info(f"🔍 DEBUG: modo={_dbg_modo} | quiz_dados={_dbg_dados} | flag_processar={_dbg_flag} | bytes_loc={_dbg_bytes_l} | bytes_loct={_dbg_bytes_lt}")
-
   # ── Se vier do modo quiz com flag de processar, pula toda a UI e vai direto ──
   _vindo_do_quiz = (
       st.session_state.get("modo_interface") == "quiz"
       and st.session_state.get("quiz_imovel_dados") is not None
       and not st.session_state.get("quiz_iniciar_processamento", False)
   )
-  st.info(f"🔍 DEBUG2: _vindo_do_quiz={_vindo_do_quiz} | processado_loc={st.session_state.get('processado_loc', False)}")
   if _vindo_do_quiz and not st.session_state.get("processado_loc"):
-
-      # Emula UploadedFile a partir dos bytes salvos no session_state
       class _FakeFile:
           def __init__(self, nome, dados):
               self.name = nome
@@ -3387,13 +3386,10 @@ elif tipo_atendimento == "locacao":
           def seek(self, n): pass
 
       def _restaurar_uploads(chave):
-          # Prioriza bytes salvos (persistentes) sobre widget (volátil entre reruns)
           salvos = st.session_state.get(f"_bytes_{chave}", [])
           if salvos:
               return [_FakeFile(s["name"], s["bytes"]) for s in salvos]
-          # Fallback: widget ainda ativo
-          widget = st.session_state.get(chave) or []
-          return widget
+          return st.session_state.get(chave) or []
 
       tem_fiador        = st.session_state.get("quiz_tem_fiador", False)
       upload_locador    = _restaurar_uploads("upload_locador")
@@ -3404,10 +3400,214 @@ elif tipo_atendimento == "locacao":
       fotos_upload      = st.session_state.get("fotos_imovel", [])
       if "intermediacao" not in imovel_dados:
           imovel_dados["intermediacao"] = {}
-      processar_loc     = True
+      processar_loc    = True
   else:
-      processar_loc  = False
+      processar_loc = False
       _vindo_do_quiz = False
+
+
+  if processar_loc:
+    # ── Bloqueios obrigatórios ──
+    erros_bloqueio = []
+    if not upload_locador:
+        erros_bloqueio.append("📂 Envie os documentos do **LOCADOR** (Bloco 01)")
+    if not upload_locatario:
+        erros_bloqueio.append("📂 Envie os documentos do **LOCATÁRIO** (Bloco 02)")
+    if tem_fiador and not upload_fiador:
+        erros_bloqueio.append("📂 Garantia = Fiador: envie os documentos do **FIADOR** (Bloco 03)")
+    if finalidade_imovel and not imovel_dados.get("area"):
+        erros_bloqueio.append("📐 Informe a **área do imóvel** (obrigatória para a cláusula contratual)")
+
+    if erros_bloqueio:
+        for e in erros_bloqueio:
+            st.error(e)
+    else:
+        def bytes_polo(upload_list):
+            result = []
+            for arq in upload_list:
+                conteudo = arq.read()
+                tipo = "pdf" if arq.name.lower().endswith('.pdf') else "imagem"
+                result.append((arq.name, conteudo, tipo))
+            return result
+
+        barra = st.progress(0, text="⚡ Processando todos os documentos em paralelo...")
+        # Lê todos os bytes UMA vez — Streamlit não permite reler após read()
+        bytes_locador   = bytes_polo(upload_locador)
+        bytes_locatario = bytes_polo(upload_locatario)
+        bytes_fiador    = bytes_polo(upload_fiador) if upload_fiador else []
+
+        texto_loc_val = st.session_state.get("texto_locacao","")
+
+        # ── PROCESSAMENTO PARALELO — todas as chamadas à API ao mesmo tempo ──
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        resultados = {}
+        erros_thread = {}
+
+        def tarefa(nome, fn, *args):
+            try:
+                return nome, fn(*args), None
+            except Exception as e:
+                return nome, None, str(e)
+
+        tarefas = [
+            ("pdfs_locador",   processar_documentos, bytes_locador),
+            ("pdfs_locatario", processar_documentos, bytes_locatario),
+            ("dados_locador",  extrair_dados_polo,   bytes_locador,   "locador",   texto_loc_val),
+            ("dados_locatario",extrair_dados_polo,   bytes_locatario, "locatario", texto_loc_val),
+        ]
+        if bytes_fiador:
+            tarefas.append(("pdfs_fiador",  processar_documentos, bytes_fiador))
+            tarefas.append(("dados_fiador", extrair_dados_polo,   bytes_fiador, "fiador", texto_loc_val))
+
+        total = len(tarefas)
+        concluidas = 0
+        with ThreadPoolExecutor(max_workers=total) as executor:
+            futures = {executor.submit(tarefa, t[0], t[1], *t[2:]): t[0] for t in tarefas}
+            for future in as_completed(futures):
+                nome_t, resultado, erro = future.result()
+                concluidas += 1
+                pct = int((concluidas / total) * 80)
+                barra.progress(pct, text=f"⚡ Processando... {concluidas}/{total} tarefas concluídas")
+                if erro:
+                    erros_thread[nome_t] = erro
+                else:
+                    resultados[nome_t] = resultado
+
+        pdfs_locador   = resultados.get("pdfs_locador",   [])
+        pdfs_locatario = resultados.get("pdfs_locatario", [])
+        pdfs_fiador    = resultados.get("pdfs_fiador",    [])
+        dados_locador_ext   = resultados.get("dados_locador",   {})
+        dados_locatario_ext = resultados.get("dados_locatario", {})
+        dados_fiador_ext    = resultados.get("dados_fiador",    {}) if bytes_fiador else {}
+
+        # Extrair cidade/UF do imóvel a partir dos dados do locador (endereço do proprietário)
+        cidade_extraida = dados_locador_ext.get("cidade_imovel", "").strip()
+        uf_extraida     = dados_locador_ext.get("uf_imovel", "").strip()
+        if cidade_extraida and not imovel_dados.get("cidade"):
+            imovel_dados["cidade"] = cidade_extraida
+        if uf_extraida and not imovel_dados.get("uf"):
+            imovel_dados["uf"] = uf_extraida
+
+        # Mesclar campos manuais (email e telefone) — têm prioridade sobre os extraídos
+        def _mesclar_manual(dados, key_email, key_tel):
+            email_m = st.session_state.get(key_email, "").strip()
+            tel_m   = st.session_state.get(key_tel,   "").strip()
+            if email_m: dados["email"]    = email_m
+            if tel_m:   dados["telefone"] = tel_m
+            return dados
+
+        dados_locador_ext   = _mesclar_manual(dados_locador_ext,   "email_manual_locador",   "tel_manual_locador")
+        dados_locatario_ext = _mesclar_manual(dados_locatario_ext, "email_manual_locatario", "tel_manual_locatario")
+        if bytes_fiador:
+            dados_fiador_ext = _mesclar_manual(dados_fiador_ext,   "email_manual_fiador",    "tel_manual_fiador")
+
+        # Validações pós-extração — avisos, não bloqueios
+        avisos_dados = []
+        if not dados_locador_ext.get("cpf"):
+            avisos_dados.append("⚠️ CPF do **LOCADOR** não identificado automaticamente — verifique ou adicione no campo de texto")
+        if not dados_locatario_ext.get("cpf"):
+            avisos_dados.append("⚠️ CPF do **LOCATÁRIO** não identificado automaticamente — verifique ou adicione no campo de texto")
+        if not dados_locatario_ext.get("renda_valor"):
+            avisos_dados.append("⚠️ Renda do **LOCATÁRIO** não identificada — adicione no campo de texto (Ex: Renda R$3.200)")
+        if bytes_fiador and not dados_fiador_ext.get("cpf"):
+            avisos_dados.append("⚠️ CPF do **FIADOR** não identificado automaticamente — verifique ou adicione no campo de texto")
+
+        # Exibe avisos mas continua processamento sempre
+        for a in avisos_dados:
+            st.warning(a)
+
+        # Salvar previews para mini checklist
+        st.session_state["preview_locador"]   = dados_locador_ext
+        st.session_state["preview_locatario"] = dados_locatario_ext
+        st.session_state["preview_fiador"]    = dados_fiador_ext
+
+        # Dados consolidados do locatário (polo principal do email)
+        dados_loc = dados_locatario_ext.copy()
+        dados_loc["nome_destinatario"] = st.session_state.get("nome_dest_locacao","")
+
+        # Todos os PDFs combinados para download
+        pdfs_loc = pdfs_locador + pdfs_locatario + pdfs_fiador
+
+        # Gerar cláusula contratual
+        barra.progress(75, text="⚖️ Gerando cláusula contratual...")
+        clausula_loc = ""
+        if finalidade_imovel == "Residencial":
+            clausula_loc = gerar_clausula_residencial(imovel_dados)
+        elif finalidade_imovel == "Comercial":
+            clausula_loc = gerar_clausula_comercial(imovel_dados)
+
+        barra.progress(82, text="📷 Analisando fotos do imóvel...")
+        termo_vistoria_bytes = None
+        fotos_nomes = []
+        if fotos_upload:
+            fotos_bytes_raw = []
+            for foto in fotos_upload:
+                conteudo_foto = foto.read()
+                fotos_bytes_raw.append((foto.name, conteudo_foto))
+                fotos_nomes.append(foto.name)
+            descricao_ia = analisar_fotos_vistoria(fotos_bytes_raw)
+            imovel_dados["vistoria_gerada"] = True
+            termo_vistoria_bytes = gerar_termo_vistoria_pdf(imovel_dados, descricao_ia, fotos_nomes)
+        else:
+            imovel_dados["vistoria_gerada"] = False
+
+        barra.progress(92, text="✍️ Gerando email profissional...")
+        email_loc = gerar_email_locacao(
+            dados_loc, pdfs_loc, imovel=imovel_dados,
+            dados_locador_direto=dados_locador_ext,
+            dados_locatario_direto=dados_locatario_ext,
+            dados_fiador_direto=dados_fiador_ext if bytes_fiador else {}
+        )
+        barra.progress(100, text="✅ Documentação pronta!")
+        time.sleep(0.4); barra.empty()
+
+        st.session_state["pdfs_gerados_loc"]    = pdfs_loc
+        st.session_state["pdfs_polo_locador"]   = pdfs_locador
+        st.session_state["pdfs_polo_locatario"] = pdfs_locatario
+        st.session_state["pdfs_polo_fiador"]    = pdfs_fiador
+        st.session_state["email_gerado_loc"]    = email_loc
+        st.session_state["dados_loc"]           = dados_loc
+        st.session_state["dados_locador"]       = dados_locador_ext
+        st.session_state["dados_locatario"]     = dados_locatario_ext
+        st.session_state["dados_fiador"]        = dados_fiador_ext
+        st.session_state["imovel_loc"]          = imovel_dados
+        st.session_state["clausula_loc"]        = clausula_loc
+        st.session_state["termo_vistoria_loc"]  = termo_vistoria_bytes
+        st.session_state["fotos_nomes_loc"]     = fotos_nomes
+        st.session_state["processado_loc"]      = True
+
+        # ── Score de risco (calcula em background, salva no session_state) ──
+        cliente_sess = st.session_state.get("cliente")
+        is_pro_score = cliente_sess.get("plano","free") in ("mensal","semestral","anual") if cliente_sess else False
+        if is_pro_score:
+            with st.spinner("📊 Calculando score de risco..."):
+                _score = calcular_score_risco(dados_locatario_ext, dados_fiador_ext if bytes_fiador else None, imovel_dados)
+                st.session_state["score_risco_loc"] = _score
+        else:
+            st.session_state["score_risco_loc"] = None
+
+        # ── Registrar no histórico ──
+        if cliente_sess:
+            total_arqs = len(bytes_locador) + len(bytes_locatario) + len(bytes_fiador)
+            registrar_uso(cliente_sess, qtd_arquivos=total_arqs)
+            _score_val = st.session_state.get("score_risco_loc",{})
+            _end_imovel = imovel_dados.get("logradouro","") or imovel_dados.get("endereco_completo","")
+            _hist_criado = __import__("datetime").datetime.now().isoformat()
+            st.session_state["hist_criado_em"] = _hist_criado
+            registrar_historico(
+                cliente_sess,
+                tipo="Locação",
+                nome_locatario=dados_locatario_ext.get("nome_completo",""),
+                nome_locador=dados_locador_ext.get("nome_completo",""),
+                score=_score_val.get("score") if _score_val else None,
+                status="Em andamento",
+                contrato_gerado=False,
+                email_enviado=False,
+                endereco_imovel=_end_imovel,
+                valor_aluguel=imovel_dados.get("valor_aluguel",""),
+            )
+
 
   # helper CSS inline para mini checklist
   def render_mini_checklist(ok_items, falta_items):
@@ -3835,209 +4035,6 @@ elif tipo_atendimento == "locacao":
       st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
       processar_loc = st.button("⚡  ANALISAR DOCUMENTAÇÃO DO INQUILINO", type="primary", use_container_width=True, key="btn_processar_locacao")
   # (se _vindo_do_quiz, processar_loc já foi definido como True e imovel_dados já está montado)
-
-  if processar_loc:
-    # ── Bloqueios obrigatórios ──
-    erros_bloqueio = []
-    if not upload_locador:
-        erros_bloqueio.append("📂 Envie os documentos do **LOCADOR** (Bloco 01)")
-    if not upload_locatario:
-        erros_bloqueio.append("📂 Envie os documentos do **LOCATÁRIO** (Bloco 02)")
-    if tem_fiador and not upload_fiador:
-        erros_bloqueio.append("📂 Garantia = Fiador: envie os documentos do **FIADOR** (Bloco 03)")
-    # Área só é obrigatória no modo painel — no quiz é opcional
-    if not _vindo_do_quiz and finalidade_imovel and not imovel_dados.get("area"):
-        erros_bloqueio.append("📐 Informe a **área do imóvel** (obrigatória para a cláusula contratual)")
-
-    if erros_bloqueio:
-        for e in erros_bloqueio:
-            st.error(e)
-    else:
-        def bytes_polo(upload_list):
-            result = []
-            for arq in upload_list:
-                conteudo = arq.read()
-                tipo = "pdf" if arq.name.lower().endswith('.pdf') else "imagem"
-                result.append((arq.name, conteudo, tipo))
-            return result
-
-        barra = st.progress(0, text="⚡ Processando todos os documentos em paralelo...")
-        # Lê todos os bytes UMA vez — Streamlit não permite reler após read()
-        bytes_locador   = bytes_polo(upload_locador)
-        bytes_locatario = bytes_polo(upload_locatario)
-        bytes_fiador    = bytes_polo(upload_fiador) if upload_fiador else []
-
-        texto_loc_val = st.session_state.get("texto_locacao","")
-
-        # ── PROCESSAMENTO PARALELO — todas as chamadas à API ao mesmo tempo ──
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-
-        resultados = {}
-        erros_thread = {}
-
-        def tarefa(nome, fn, *args):
-            try:
-                return nome, fn(*args), None
-            except Exception as e:
-                return nome, None, str(e)
-
-        tarefas = [
-            ("pdfs_locador",   processar_documentos, bytes_locador),
-            ("pdfs_locatario", processar_documentos, bytes_locatario),
-            ("dados_locador",  extrair_dados_polo,   bytes_locador,   "locador",   texto_loc_val),
-            ("dados_locatario",extrair_dados_polo,   bytes_locatario, "locatario", texto_loc_val),
-        ]
-        if bytes_fiador:
-            tarefas.append(("pdfs_fiador",  processar_documentos, bytes_fiador))
-            tarefas.append(("dados_fiador", extrair_dados_polo,   bytes_fiador, "fiador", texto_loc_val))
-
-        total = len(tarefas)
-        concluidas = 0
-        with ThreadPoolExecutor(max_workers=total) as executor:
-            futures = {executor.submit(tarefa, t[0], t[1], *t[2:]): t[0] for t in tarefas}
-            for future in as_completed(futures):
-                nome_t, resultado, erro = future.result()
-                concluidas += 1
-                pct = int((concluidas / total) * 80)
-                barra.progress(pct, text=f"⚡ Processando... {concluidas}/{total} tarefas concluídas")
-                if erro:
-                    erros_thread[nome_t] = erro
-                else:
-                    resultados[nome_t] = resultado
-
-        pdfs_locador   = resultados.get("pdfs_locador",   [])
-        pdfs_locatario = resultados.get("pdfs_locatario", [])
-        pdfs_fiador    = resultados.get("pdfs_fiador",    [])
-        dados_locador_ext   = resultados.get("dados_locador",   {})
-        dados_locatario_ext = resultados.get("dados_locatario", {})
-        dados_fiador_ext    = resultados.get("dados_fiador",    {}) if bytes_fiador else {}
-
-        # Extrair cidade/UF do imóvel a partir dos dados do locador (endereço do proprietário)
-        cidade_extraida = dados_locador_ext.get("cidade_imovel", "").strip()
-        uf_extraida     = dados_locador_ext.get("uf_imovel", "").strip()
-        if cidade_extraida and not imovel_dados.get("cidade"):
-            imovel_dados["cidade"] = cidade_extraida
-        if uf_extraida and not imovel_dados.get("uf"):
-            imovel_dados["uf"] = uf_extraida
-
-        # Mesclar campos manuais (email e telefone) — têm prioridade sobre os extraídos
-        def _mesclar_manual(dados, key_email, key_tel):
-            email_m = st.session_state.get(key_email, "").strip()
-            tel_m   = st.session_state.get(key_tel,   "").strip()
-            if email_m: dados["email"]    = email_m
-            if tel_m:   dados["telefone"] = tel_m
-            return dados
-
-        dados_locador_ext   = _mesclar_manual(dados_locador_ext,   "email_manual_locador",   "tel_manual_locador")
-        dados_locatario_ext = _mesclar_manual(dados_locatario_ext, "email_manual_locatario", "tel_manual_locatario")
-        if bytes_fiador:
-            dados_fiador_ext = _mesclar_manual(dados_fiador_ext,   "email_manual_fiador",    "tel_manual_fiador")
-
-        # Validações pós-extração — avisos, não bloqueios
-        avisos_dados = []
-        if not dados_locador_ext.get("cpf"):
-            avisos_dados.append("⚠️ CPF do **LOCADOR** não identificado automaticamente — verifique ou adicione no campo de texto")
-        if not dados_locatario_ext.get("cpf"):
-            avisos_dados.append("⚠️ CPF do **LOCATÁRIO** não identificado automaticamente — verifique ou adicione no campo de texto")
-        if not dados_locatario_ext.get("renda_valor"):
-            avisos_dados.append("⚠️ Renda do **LOCATÁRIO** não identificada — adicione no campo de texto (Ex: Renda R$3.200)")
-        if bytes_fiador and not dados_fiador_ext.get("cpf"):
-            avisos_dados.append("⚠️ CPF do **FIADOR** não identificado automaticamente — verifique ou adicione no campo de texto")
-
-        # Exibe avisos mas continua processamento sempre
-        for a in avisos_dados:
-            st.warning(a)
-
-        # Salvar previews para mini checklist
-        st.session_state["preview_locador"]   = dados_locador_ext
-        st.session_state["preview_locatario"] = dados_locatario_ext
-        st.session_state["preview_fiador"]    = dados_fiador_ext
-
-        # Dados consolidados do locatário (polo principal do email)
-        dados_loc = dados_locatario_ext.copy()
-        dados_loc["nome_destinatario"] = st.session_state.get("nome_dest_locacao","")
-
-        # Todos os PDFs combinados para download
-        pdfs_loc = pdfs_locador + pdfs_locatario + pdfs_fiador
-
-        # Gerar cláusula contratual
-        barra.progress(75, text="⚖️ Gerando cláusula contratual...")
-        clausula_loc = ""
-        if finalidade_imovel == "Residencial":
-            clausula_loc = gerar_clausula_residencial(imovel_dados)
-        elif finalidade_imovel == "Comercial":
-            clausula_loc = gerar_clausula_comercial(imovel_dados)
-
-        barra.progress(82, text="📷 Analisando fotos do imóvel...")
-        termo_vistoria_bytes = None
-        fotos_nomes = []
-        if fotos_upload:
-            fotos_bytes_raw = []
-            for foto in fotos_upload:
-                conteudo_foto = foto.read()
-                fotos_bytes_raw.append((foto.name, conteudo_foto))
-                fotos_nomes.append(foto.name)
-            descricao_ia = analisar_fotos_vistoria(fotos_bytes_raw)
-            imovel_dados["vistoria_gerada"] = True
-            termo_vistoria_bytes = gerar_termo_vistoria_pdf(imovel_dados, descricao_ia, fotos_nomes)
-        else:
-            imovel_dados["vistoria_gerada"] = False
-
-        barra.progress(92, text="✍️ Gerando email profissional...")
-        email_loc = gerar_email_locacao(
-            dados_loc, pdfs_loc, imovel=imovel_dados,
-            dados_locador_direto=dados_locador_ext,
-            dados_locatario_direto=dados_locatario_ext,
-            dados_fiador_direto=dados_fiador_ext if bytes_fiador else {}
-        )
-        barra.progress(100, text="✅ Documentação pronta!")
-        time.sleep(0.4); barra.empty()
-
-        st.session_state["pdfs_gerados_loc"]    = pdfs_loc
-        st.session_state["pdfs_polo_locador"]   = pdfs_locador
-        st.session_state["pdfs_polo_locatario"] = pdfs_locatario
-        st.session_state["pdfs_polo_fiador"]    = pdfs_fiador
-        st.session_state["email_gerado_loc"]    = email_loc
-        st.session_state["dados_loc"]           = dados_loc
-        st.session_state["dados_locador"]       = dados_locador_ext
-        st.session_state["dados_locatario"]     = dados_locatario_ext
-        st.session_state["dados_fiador"]        = dados_fiador_ext
-        st.session_state["imovel_loc"]          = imovel_dados
-        st.session_state["clausula_loc"]        = clausula_loc
-        st.session_state["termo_vistoria_loc"]  = termo_vistoria_bytes
-        st.session_state["fotos_nomes_loc"]     = fotos_nomes
-        st.session_state["processado_loc"]      = True
-
-        # ── Score de risco (calcula em background, salva no session_state) ──
-        cliente_sess = st.session_state.get("cliente")
-        is_pro_score = cliente_sess.get("plano","free") in ("mensal","semestral","anual") if cliente_sess else False
-        if is_pro_score:
-            with st.spinner("📊 Calculando score de risco..."):
-                _score = calcular_score_risco(dados_locatario_ext, dados_fiador_ext if bytes_fiador else None, imovel_dados)
-                st.session_state["score_risco_loc"] = _score
-        else:
-            st.session_state["score_risco_loc"] = None
-
-        # ── Registrar no histórico ──
-        if cliente_sess:
-            total_arqs = len(bytes_locador) + len(bytes_locatario) + len(bytes_fiador)
-            registrar_uso(cliente_sess, qtd_arquivos=total_arqs)
-            _score_val = st.session_state.get("score_risco_loc",{})
-            _end_imovel = imovel_dados.get("logradouro","") or imovel_dados.get("endereco_completo","")
-            _hist_criado = __import__("datetime").datetime.now().isoformat()
-            st.session_state["hist_criado_em"] = _hist_criado
-            registrar_historico(
-                cliente_sess,
-                tipo="Locação",
-                nome_locatario=dados_locatario_ext.get("nome_completo",""),
-                nome_locador=dados_locador_ext.get("nome_completo",""),
-                score=_score_val.get("score") if _score_val else None,
-                status="Em andamento",
-                contrato_gerado=False,
-                email_enviado=False,
-                endereco_imovel=_end_imovel,
-                valor_aluguel=imovel_dados.get("valor_aluguel",""),
-            )
 
   if st.session_state.get("processado_loc"):
     pdfs_loc         = st.session_state["pdfs_gerados_loc"]
