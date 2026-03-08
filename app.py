@@ -933,6 +933,272 @@ def chamar_gemini(lista_parts):
 # BLOCO 2 — PROCESSAMENTO DE DOCUMENTOS
 # ══════════════════════════════════════════════════════
 
+# Tipos de documento reconhecidos pela IA
+TIPOS_DOC = [
+    "RG", "CNH", "CPF", "Certidão de Nascimento", "Certidão de Casamento",
+    "Holerite", "Extrato Bancário", "Decore", "Contrato de Trabalho",
+    "Pró-labore", "Declaração de IR", "Contrato de Prestação de Serviço",
+    "Comprovante de Residência", "Conta de Luz", "Conta de Água", "Conta de Internet",
+    "Escritura", "Matrícula de Imóvel", "IPTU",
+    "Outro"
+]
+
+# Mapa de tipo → categoria funcional
+_CATEGORIA_DOC = {
+    "RG":                            "identidade",
+    "CNH":                           "identidade",
+    "CPF":                           "cpf",
+    "Certidão de Nascimento":        "estado_civil",
+    "Certidão de Casamento":         "estado_civil",
+    "Holerite":                      "renda",
+    "Extrato Bancário":              "renda",
+    "Decore":                        "renda",
+    "Contrato de Trabalho":          "renda",
+    "Pró-labore":                    "renda",
+    "Declaração de IR":              "renda",
+    "Contrato de Prestação de Serviço": "renda",
+    "Comprovante de Residência":     "residencia",
+    "Conta de Luz":                  "residencia",
+    "Conta de Água":                 "residencia",
+    "Conta de Internet":             "residencia",
+    "Escritura":                     "imovel_proprio",
+    "Matrícula de Imóvel":           "imovel_proprio",
+    "IPTU":                          "imovel_proprio",
+    "Outro":                         "outro",
+}
+
+# Docs obrigatórios por polo
+_OBRIGATORIOS = {
+    "locatario": ["identidade", "renda", "residencia"],
+    "locador":   ["identidade", "residencia"],
+    "fiador":    ["identidade", "renda", "residencia", "imovel_proprio"],
+}
+
+_LABELS_CAT = {
+    "identidade":    "RG ou CNH",
+    "cpf":           "CPF",
+    "renda":         "Comprovante de renda",
+    "residencia":    "Comprovante de residência",
+    "imovel_proprio":"Comprovante de imóvel próprio",
+}
+
+
+def parsear_contexto_partes(texto_contexto):
+    """
+    Parseia o texto de contexto do corretor e retorna dict com email/telefone por polo.
+    Exemplo de entrada:
+      locatario, Breno, email breno@gmail.com, telefone 81 99450-5765, Rua Berlim
+      locador, Annaic, email annaic@gmail.com, telefone 81 99798-932, Rua Padre José
+      fiador, José, email jose@gmail.com, telefone 81 98960-9411, Rua Joaquim
+
+    Retorna:
+      {
+        "locatario": {"nome": "Breno", "email": "breno@gmail.com", "telefone": "81 99450-5765", "endereco_hint": "Rua Berlim"},
+        "locador":   {...},
+        "fiador":    {...},
+      }
+    """
+    import re
+    resultado = {}
+    if not texto_contexto:
+        return resultado
+
+    polos_map = {
+        "locatario": "locatario", "locatário": "locatario", "inquilino": "locatario",
+        "locador":   "locador",   "proprietario": "locador", "proprietário": "locador",
+        "fiador":    "fiador",    "garantidor": "fiador",
+    }
+
+    for linha in texto_contexto.strip().split("\n"):
+        linha = linha.strip()
+        if not linha:
+            continue
+
+        # Detectar o polo pelo primeiro token
+        primeira = linha.split(",")[0].strip().lower()
+        polo = None
+        for key, val in polos_map.items():
+            if key in primeira:
+                polo = val
+                break
+        if not polo:
+            continue
+
+        partes = [p.strip() for p in linha.split(",")]
+        info = {"nome": "", "email": "", "telefone": "", "endereco_hint": ""}
+
+        # Nome: segundo token
+        if len(partes) > 1:
+            info["nome"] = partes[1].strip()
+
+        # Percorrer tokens buscando email, telefone, endereço
+        texto_completo = ", ".join(partes[2:]) if len(partes) > 2 else ""
+
+        # Email
+        m_email = re.search(r'[\w.\-+]+@[\w.\-]+\.[a-zA-Z]{2,}', linha)
+        if m_email:
+            info["email"] = m_email.group(0)
+
+        # Telefone — sequência de dígitos com possível formatação
+        m_tel = re.search(r'(?:telefone|tel|fone|whatsapp)[\s:]*([0-9\s\-().+]{8,20})', linha, re.IGNORECASE)
+        if m_tel:
+            tel_raw = re.sub(r'[^\d]', '', m_tel.group(1))
+            if len(tel_raw) >= 8:
+                # Formatar: (XX) XXXXX-XXXX
+                if len(tel_raw) == 11:
+                    info["telefone"] = f"({tel_raw[:2]}) {tel_raw[2:7]}-{tel_raw[7:]}"
+                elif len(tel_raw) == 10:
+                    info["telefone"] = f"({tel_raw[:2]}) {tel_raw[2:6]}-{tel_raw[6:]}"
+                else:
+                    info["telefone"] = tel_raw
+
+        # Endereço hint: último token que começa com Rua, Av, etc.
+        for p in partes:
+            p_clean = p.strip()
+            if re.match(r'^(rua|av\.|avenida|alameda|travessa|estrada|rod\.|rodovia)', p_clean, re.IGNORECASE):
+                info["endereco_hint"] = p_clean
+                break
+
+        resultado[polo] = info
+
+    return resultado
+
+
+def classificar_docs_por_tipo(todos_bytes, texto_contexto=""):
+    """
+    Recebe lista de {"name": ..., "bytes": ...} com todos os docs misturados.
+    Retorna lista de dicts com: name, tipo, categoria, polo, confianca.
+    Usa Gemini para identificar cada arquivo em uma única chamada.
+    """
+    if not todos_bytes:
+        return []
+
+    tipos_str = ", ".join(TIPOS_DOC)
+    prompt = f"""Você é um especialista em documentos imobiliários brasileiros.
+Analise cada documento abaixo e para cada um retorne:
+- "arquivo": nome do arquivo (exatamente como fornecido)
+- "tipo": o tipo do documento (um de: {tipos_str})
+- "polo": a qual parte pertence — use o CONTEXTO abaixo para identificar pelo nome, email ou endereço parcial
+  Valores possíveis de polo: "locatario", "locador", "fiador", "desconhecido"
+- "nome_pessoa": nome completo da pessoa identificada no documento (se legível)
+- "confianca": "alta", "media" ou "baixa"
+
+CONTEXTO DAS PARTES (fornecido pelo corretor):
+{texto_contexto if texto_contexto else "Não informado"}
+
+REGRAS:
+- CNH contém CPF e substitui RG+CPF
+- RG moderno pode conter CPF no verso
+- Holerite, extrato, decore = comprovante de renda
+- Conta de luz/água/internet/aluguel = comprovante de residência
+- Se não conseguir identificar o polo, use "desconhecido"
+- Se não conseguir identificar o tipo, use "Outro"
+
+RETORNE APENAS JSON válido, sem markdown:
+{{"documentos": [{{"arquivo":"","tipo":"","polo":"","nome_pessoa":"","confianca":""}}]}}
+"""
+    parts = [{"text": prompt}]
+    for doc in todos_bytes:
+        nome = doc["name"]
+        dados = doc["bytes"]
+        b64 = base64.b64encode(dados).decode("utf-8")
+        n = nome.lower()
+        if n.endswith(".pdf"):                mime = "application/pdf"
+        elif n.endswith(".png"):              mime = "image/png"
+        elif n.endswith(".webp"):             mime = "image/webp"
+        elif n.endswith(".bmp"):              mime = "image/bmp"
+        elif n.endswith((".tiff",".tif")):    mime = "image/tiff"
+        else:                                 mime = "image/jpeg"
+        parts += [{"text": f"ARQUIVO: {nome}"}, {"inline_data": {"mime_type": mime, "data": b64}}]
+
+    try:
+        resp  = chamar_gemini(parts)
+        dados = json.loads(resp.replace("```json","").replace("```","").strip())
+        resultado = []
+        for d in dados.get("documentos", []):
+            tipo = d.get("tipo", "Outro")
+            resultado.append({
+                "name":        d.get("arquivo", ""),
+                "tipo":        tipo,
+                "categoria":   _CATEGORIA_DOC.get(tipo, "outro"),
+                "polo":        d.get("polo", "desconhecido"),
+                "nome_pessoa": d.get("nome_pessoa", ""),
+                "confianca":   d.get("confianca", "baixa"),
+            })
+        return resultado
+    except Exception as e:
+        # Fallback: retorna todos como desconhecidos
+        return [{"name": d["name"], "tipo": "Outro", "categoria": "outro",
+                 "polo": "desconhecido", "nome_pessoa": "", "confianca": "baixa"}
+                for d in todos_bytes]
+
+
+def validar_checklist_locacao(docs_classificados, tem_fiador=False):
+    """
+    Recebe a lista classificada e retorna um dict com o resultado da validação.
+    {
+      "ok": True/False,
+      "polos": {
+        "locatario": {"ok": True, "presentes": [...], "faltando": [...]},
+        ...
+      }
+    }
+    """
+    polos_checar = ["locatario", "locador"]
+    if tem_fiador:
+        polos_checar.append("fiador")
+
+    resultado = {"ok": True, "polos": {}}
+
+    for polo in polos_checar:
+        obrigatorios = _OBRIGATORIOS[polo]
+        # Categorias presentes para este polo
+        cats_presentes = set(
+            d["categoria"] for d in docs_classificados
+            if d["polo"] == polo and d["categoria"] != "outro"
+        )
+        # CNH cobre identidade E cpf
+        if "identidade" in cats_presentes:
+            cats_presentes.add("cpf")
+
+        faltando = [_LABELS_CAT[c] for c in obrigatorios if c not in cats_presentes]
+        ok_polo  = len(faltando) == 0
+
+        resultado["polos"][polo] = {
+            "ok":        ok_polo,
+            "presentes": [_LABELS_CAT.get(c, c) for c in cats_presentes if c in _LABELS_CAT],
+            "faltando":  faltando,
+        }
+        if not ok_polo:
+            resultado["ok"] = False
+
+    return resultado
+
+
+def gerar_lista_docs_email(docs_classificados, tem_fiador=False):
+    """
+    Gera o bloco de texto com a lista de documentos organizada por polo
+    para incluir no corpo do email.
+    """
+    labels_polo = {
+        "locatario": "LOCATÁRIO",
+        "locador":   "LOCADOR / PROPRIETÁRIO",
+        "fiador":    "FIADOR",
+    }
+    ordem = ["locatario", "locador", "fiador"] if tem_fiador else ["locatario", "locador"]
+    linhas = []
+    for polo in ordem:
+        docs_polo = [d for d in docs_classificados if d["polo"] == polo]
+        if not docs_polo:
+            continue
+        linhas.append(f"📁 {labels_polo.get(polo, polo.upper())}")
+        for d in docs_polo:
+            nome_p = f" — {d['nome_pessoa']}" if d.get("nome_pessoa") else ""
+            linhas.append(f"   • {d['tipo']}{nome_p}")
+        linhas.append("")
+    return "\n".join(linhas).strip()
+
+
 def processar_documentos(arquivos_bytes):
     pdfs_finais = []
     tmp = tempfile.mkdtemp()
@@ -2038,11 +2304,36 @@ RETORNE APENAS JSON válido (sem markdown, sem texto extra):
             digitos = re.sub(r'\D','', str(cpf_raw))
             if len(digitos) == 11:
                 resultado["cpf"] = f"{digitos[:3]}.{digitos[3:6]}.{digitos[6:9]}-{digitos[9:]}"
+
+        # ── Merge com dados do contexto (email/telefone/nome têm prioridade) ──
+        if texto_bruto:
+            _ctx = parsear_contexto_partes(texto_bruto)
+            _info_polo = _ctx.get(polo, {})
+            # Email do contexto prevalece — já confirmado pelo corretor
+            if _info_polo.get("email") and not resultado.get("email"):
+                resultado["email"] = _info_polo["email"]
+            elif _info_polo.get("email"):
+                resultado["email"] = _info_polo["email"]  # sempre usa o do contexto
+            # Telefone do contexto prevalece
+            if _info_polo.get("telefone"):
+                resultado["telefone"] = _info_polo["telefone"]
+            # Nome: se IA não encontrou, usa o nome parcial do contexto
+            if not resultado.get("nome_completo") and _info_polo.get("nome"):
+                resultado["nome_completo"] = _info_polo["nome"]
+
         return resultado
     except Exception as _e:
         import streamlit as _st
         _st.warning(f"⚠️ Falha ao extrair dados do {polo}: {_e}")
-        return {k: "" for k in cfg['campos']}
+        # Mesmo com erro, tenta retornar email/telefone do contexto
+        _fallback = {k: "" for k in cfg['campos']}
+        if texto_bruto:
+            _ctx = parsear_contexto_partes(texto_bruto)
+            _info = _ctx.get(polo, {})
+            if _info.get("email"):     _fallback["email"]    = _info["email"]
+            if _info.get("telefone"):  _fallback["telefone"] = _info["telefone"]
+            if _info.get("nome"):      _fallback["nome_completo"] = _info["nome"]
+        return _fallback
 
 def mini_checklist_polo(dados, polo):
     """Retorna mini checklist visual por polo jurídico."""
@@ -2089,7 +2380,8 @@ def _bloco_polo_email(titulo, dados):
 
 
 def gerar_email_locacao(dados, pdfs_selecionados, imovel=None,
-                        dados_locador_direto=None, dados_locatario_direto=None, dados_fiador_direto=None):
+                        dados_locador_direto=None, dados_locatario_direto=None, dados_fiador_direto=None,
+                        docs_classificados=None):
     import streamlit as _st
     hora = datetime.now(timezone(timedelta(hours=-3))).hour
     if 6 <= hora < 12:    saud = "Bom dia"
@@ -2102,31 +2394,51 @@ def gerar_email_locacao(dados, pdfs_selecionados, imovel=None,
 
     assunto = f"Documentação para análise de locação — {nome_cliente}"
 
-    # Usa dados passados diretamente (prioridade) ou fallback para session_state
     dados_locatario = dados_locatario_direto if dados_locatario_direto is not None else _st.session_state.get("dados_locatario", dados)
     dados_fiador    = dados_fiador_direto    if dados_fiador_direto    is not None else _st.session_state.get("dados_fiador", {})
     dados_locador   = dados_locador_direto   if dados_locador_direto   is not None else _st.session_state.get("dados_locador", {})
+    tem_fiador      = bool(dados_fiador and dados_fiador.get("nome_completo"))
 
-    # Garantia locatícia
-    tipo_garantia = dados.get("tipo_garantia", "")
+    tipo_garantia = dados.get("tipo_garantia", _st.session_state.get("quiz_garantia", ""))
 
     bloco_locatario = _bloco_polo_email("DADOS DO(A) LOCATÁRIO(A)", dados_locatario)
-    bloco_fiador    = _bloco_polo_email("DADOS DO(A) FIADOR(A)", dados_fiador) if dados_fiador else ""
+    bloco_fiador    = _bloco_polo_email("DADOS DO(A) FIADOR(A)", dados_fiador) if tem_fiador else ""
     bloco_locador   = _bloco_polo_email("DADOS DO(A) PROPRIETÁRIO(A)", dados_locador) if dados_locador else ""
-    bloco_imovel    = gerar_bloco_email_imovel(imovel) if imovel else ""
 
     blocos = [b for b in [bloco_locatario, bloco_fiador, bloco_locador] if b]
     corpo_polos = "\n\n".join(blocos)
 
-    garantia_linha = f"\nGarantia locatícia: {tipo_garantia}\n" if tipo_garantia else ""
+    # Bloco de documentos organizados
+    bloco_docs = ""
+    if docs_classificados:
+        lista = gerar_lista_docs_email(docs_classificados, tem_fiador=tem_fiador)
+        if lista:
+            bloco_docs = f"\n\nDOCUMENTOS ANEXADOS\n{lista}"
+
+    # Dados do imóvel
+    bloco_imovel = ""
+    if imovel:
+        bloco_imovel = gerar_bloco_email_imovel(imovel)
+    else:
+        _gar = tipo_garantia or _st.session_state.get("quiz_garantia", "")
+        _end = _st.session_state.get("quiz_endereco_imovel", "")
+        _cid = _st.session_state.get("quiz_end_cidade", "")
+        _uf  = _st.session_state.get("quiz_end_uf", "")
+        _end_full = ", ".join(p for p in [_end, _cid, _uf] if p)
+        linhas_imovel = ["\nDADOS DO IMÓVEL"]
+        if _end_full: linhas_imovel.append(f"* Endereço: {_end_full}")
+        if _gar:      linhas_imovel.append(f"* Garantia locatícia: {_gar}")
+        if len(linhas_imovel) > 1:
+            bloco_imovel = "\n".join(linhas_imovel)
 
     return f"""Assunto: {assunto}
 
 {saud_txt}
 
 Encaminho a documentação para análise de locação do imóvel.
-{garantia_linha}
+
 {corpo_polos}
+{bloco_docs}
 {bloco_imovel}
 
 Fico no aguardo do parecer.
@@ -3176,81 +3488,130 @@ if _modo_interface == "quiz" and tipo_atendimento == "locacao":
         # Já processou — cai no fluxo normal para mostrar resultados
         pass
     elif _quiz_iniciar:
-        # Usuário clicou em processar no quiz — limpar flag e deixar o fluxo
-        # de locação rodar normalmente (if tipo_atendimento == "locacao" abaixo)
-        # Para isso, precisamos que as variáveis do painel estejam mapeadas
-        # O fluxo principal espera: upload_locador, upload_locatario, etc. (mesmas keys)
-        # e imovel_dados — que precisa ser montado aqui
-        _fin = st.session_state.get("finalidade_imovel", "Residencial")
-        _mat = st.session_state.get("mat_imovel", "")
-        _imovel_quiz = {"finalidade": _fin, "matricula": _mat}
-        if _fin == "Residencial":
-            _imovel_quiz.update({
-                "tipo_imovel":  st.session_state.get("tipo_res", "Casa"),
-                "area":         st.session_state.get("area_res", 0) or "",
-                "quartos":      st.session_state.get("quartos_r", 0),
-                "suites":       st.session_state.get("suites_r", 0),
-                "banheiros":    st.session_state.get("banhos_r", 0),
-                "salas":        st.session_state.get("salas_r", 0),
-                "vagas":        st.session_state.get("vagas_r", 0),
-                "mobiliado":    st.session_state.get("mob_r", "Não"),
-                "cozinha":      st.session_state.get("coz_r", True),
-                "area_servico": st.session_state.get("as_r", False),
-                "varanda":      st.session_state.get("var_r", False),
-                "quintal":      st.session_state.get("qui_r", False),
-                "descricao":    st.session_state.get("desc_res", ""),
-            })
-        else:
-            _imovel_quiz.update({
-                "tipo_imovel":          st.session_state.get("tipo_com", "Sala comercial"),
-                "area":                 st.session_state.get("area_com", 0) or "",
-                "salas_internas":       st.session_state.get("salas_c", 0),
-                "banheiros":            st.session_state.get("banhos_c", 0),
-                "vagas":                st.session_state.get("vagas_c", 0),
-                "recepcao":             st.session_state.get("rec_c", False),
-                "deposito":             st.session_state.get("dep_c", False),
-                "copa":                 st.session_state.get("copa_c", False),
-                "atividade_permitida":  st.session_state.get("ativ_c", ""),
-                "cnae":                 st.session_state.get("cnae_c", ""),
-                "descricao":            st.session_state.get("desc_com", ""),
-            })
-        # Endereço e financeiro
-        _pix = {}
-        if st.session_state.get("forma_pagamento") == "PIX":
-            _pix = {
-                "chave":      st.session_state.get("pix_chave", ""),
-                "favorecido": st.session_state.get("pix_favorecido", ""),
-                "banco":      st.session_state.get("pix_banco", ""),
-                "tipo":       st.session_state.get("pix_tipo", "CPF"),
+        _modo_servico = st.session_state.get("quiz_modo_servico", "email_aluguel")
+
+        # ── FLUXO EMAIL ALUGUEL — classifica docs e valida checklist ──
+        if _modo_servico == "email_aluguel":
+            _todos_bytes = st.session_state.get("quiz_todos_docs_bytes", [])
+            _texto_ctx   = st.session_state.get("quiz_texto_contexto", "")
+            _tem_fiador  = st.session_state.get("quiz_tem_fiador", False)
+
+            if not st.session_state.get("quiz_docs_classificados"):
+                with st.spinner("🔍 Identificando documentos..."):
+                    _classificados = classificar_docs_por_tipo(_todos_bytes, _texto_ctx)
+                    st.session_state["quiz_docs_classificados"] = _classificados
+            else:
+                _classificados = st.session_state["quiz_docs_classificados"]
+
+            _validacao = validar_checklist_locacao(_classificados, _tem_fiador)
+
+            if not _validacao["ok"]:
+                st.session_state["quiz_iniciar_processamento"] = False
+                st.markdown("""
+                <div style='background:#FFF5F5;border:1.5px solid #FC8181;border-radius:12px;
+                            padding:16px 20px;margin-bottom:12px;'>
+                    <div style='font-size:15px;font-weight:700;color:#C53030;margin-bottom:8px;'>
+                        ⛔ Documentação incompleta — envio bloqueado
+                    </div>
+                    <div style='font-size:13px;color:#742A2A;'>
+                        Os documentos abaixo são obrigatórios para o gerente/correspondente aprovar o inquilino.
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                _labels_polo = {"locatario":"👤 Locatário","locador":"🏠 Locador","fiador":"🤝 Fiador"}
+                for _polo, _res in _validacao["polos"].items():
+                    if _res["faltando"]:
+                        with st.container(border=True):
+                            st.markdown(f"**{_labels_polo.get(_polo, _polo.upper())}**")
+                            for _doc in _res["faltando"]:
+                                st.markdown(f"❌ **{_doc}** — não encontrado nos arquivos enviados")
+                            if _res["presentes"]:
+                                st.caption(f"✅ Já identificados: {', '.join(_res['presentes'])}")
+                if st.button("📎 Enviar documentos faltantes", type="primary", use_container_width=True, key="quiz_reenviar_docs"):
+                    st.session_state.pop("quiz_docs_classificados", None)
+                    st.session_state["etapa_quiz"] = 3
+                    st.rerun()
+                st.stop()
+
+            # Checklist OK — prosseguir
+            st.session_state["quiz_imovel_dados"] = {
+                "finalidade": st.session_state.get("finalidade_imovel", ""),
+                "garantia":   st.session_state.get("quiz_garantia", ""),
+                "matricula":  "",
             }
-        _imovel_quiz.update({
-            "valor_aluguel":    st.session_state.get("valor_aluguel", 0),
-            "dia_vencimento":   st.session_state.get("dia_vencimento", 5),
-            "forma_pagamento":  st.session_state.get("forma_pagamento", "PIX"),
-            "duracao_contrato": st.session_state.get("duracao_contrato", "12 meses"),
-            "data_inicio":      str(st.session_state.get("data_inicio_contrato", "")),
-            "pix_dados":        _pix,
-            "fotos":            len(st.session_state.get("fotos_imovel", [])),
-            "intermediacao": {
-                "tipo":            st.session_state.get("tipo_interm", ""),
-                "nome":            st.session_state.get("nome_interm", ""),
-                "creci_cnpj":      st.session_state.get("creci_interm", ""),
-                "cpf_cnpj":        st.session_state.get("cpf_cnpj_interm", ""),
-                "telefone":        st.session_state.get("tel_interm", ""),
-                "email":           st.session_state.get("email_interm", ""),
-                "modelo_comissao": st.session_state.get("modelo_comissao", ""),
-                "valor_comissao":  st.session_state.get("valor_comissao_str", ""),
-                "tem_adm":         st.session_state.get("tem_adm", False),
-                "taxa_adm":        st.session_state.get("taxa_adm_str", ""),
-                "servicos_adm":    st.session_state.get("servicos_adm", []),
-                "vigencia":        st.session_state.get("vigencia_interm", ""),
-                "aviso_rescisao":  st.session_state.get("aviso_interm", ""),
-            } if st.session_state.get("quiz_tem_interm") else {},
-            "cidade":           st.session_state.get("quiz_end_cidade", ""),
-            "uf":               st.session_state.get("quiz_end_uf", ""),
-        })
-        st.session_state["quiz_imovel_dados"] = _imovel_quiz
-        st.session_state["quiz_iniciar_processamento"] = False
+            st.session_state["quiz_iniciar_processamento"] = False
+
+        else:
+            # contrato_aluguel / email_venda / contrato_venda
+            _fin = st.session_state.get("finalidade_imovel", "Residencial")
+            _mat = st.session_state.get("mat_imovel", "")
+            _imovel_quiz = {"finalidade": _fin, "matricula": _mat}
+            if _fin == "Residencial":
+                _imovel_quiz.update({
+                    "tipo_imovel":  st.session_state.get("tipo_res", "Casa"),
+                    "area":         st.session_state.get("area_res", 0) or "",
+                    "quartos":      st.session_state.get("quartos_r", 0),
+                    "suites":       st.session_state.get("suites_r", 0),
+                    "banheiros":    st.session_state.get("banhos_r", 0),
+                    "salas":        st.session_state.get("salas_r", 0),
+                    "vagas":        st.session_state.get("vagas_r", 0),
+                    "mobiliado":    st.session_state.get("mob_r", "Não"),
+                    "cozinha":      st.session_state.get("coz_r", True),
+                    "area_servico": st.session_state.get("as_r", False),
+                    "varanda":      st.session_state.get("var_r", False),
+                    "quintal":      st.session_state.get("qui_r", False),
+                    "descricao":    st.session_state.get("desc_res", ""),
+                })
+            else:
+                _imovel_quiz.update({
+                    "tipo_imovel":         st.session_state.get("tipo_com", "Sala comercial"),
+                    "area":                st.session_state.get("area_com", 0) or "",
+                    "salas_internas":      st.session_state.get("salas_c", 0),
+                    "banheiros":           st.session_state.get("banhos_c", 0),
+                    "vagas":               st.session_state.get("vagas_c", 0),
+                    "recepcao":            st.session_state.get("rec_c", False),
+                    "deposito":            st.session_state.get("dep_c", False),
+                    "copa":                st.session_state.get("copa_c", False),
+                    "atividade_permitida": st.session_state.get("ativ_c", ""),
+                    "cnae":                st.session_state.get("cnae_c", ""),
+                    "descricao":           st.session_state.get("desc_com", ""),
+                })
+            _pix = {}
+            if st.session_state.get("forma_pagamento") == "PIX":
+                _pix = {
+                    "chave":      st.session_state.get("pix_chave", ""),
+                    "favorecido": st.session_state.get("pix_favorecido", ""),
+                    "banco":      st.session_state.get("pix_banco", ""),
+                    "tipo":       st.session_state.get("pix_tipo", "CPF"),
+                }
+            _imovel_quiz.update({
+                "valor_aluguel":    st.session_state.get("valor_aluguel", 0),
+                "dia_vencimento":   st.session_state.get("dia_vencimento", 5),
+                "forma_pagamento":  st.session_state.get("forma_pagamento", "PIX"),
+                "duracao_contrato": st.session_state.get("duracao_contrato", "12 meses"),
+                "data_inicio":      str(st.session_state.get("data_inicio_contrato", "")),
+                "pix_dados":        _pix,
+                "fotos":            len(st.session_state.get("fotos_imovel", [])),
+                "intermediacao": {
+                    "tipo":            st.session_state.get("tipo_interm", ""),
+                    "nome":            st.session_state.get("nome_interm", ""),
+                    "creci_cnpj":      st.session_state.get("creci_interm", ""),
+                    "cpf_cnpj":        st.session_state.get("cpf_cnpj_interm", ""),
+                    "telefone":        st.session_state.get("tel_interm", ""),
+                    "email":           st.session_state.get("email_interm", ""),
+                    "modelo_comissao": st.session_state.get("modelo_comissao", ""),
+                    "valor_comissao":  st.session_state.get("valor_comissao_str", ""),
+                    "tem_adm":         st.session_state.get("tem_adm", False),
+                    "taxa_adm":        st.session_state.get("taxa_adm_str", ""),
+                    "servicos_adm":    st.session_state.get("servicos_adm", []),
+                    "vigencia":        st.session_state.get("vigencia_interm", ""),
+                    "aviso_rescisao":  st.session_state.get("aviso_interm", ""),
+                } if st.session_state.get("quiz_tem_interm") else {},
+                "cidade": st.session_state.get("quiz_end_cidade", ""),
+                "uf":     st.session_state.get("quiz_end_uf", ""),
+            })
+            st.session_state["quiz_imovel_dados"] = _imovel_quiz
+            st.session_state["quiz_iniciar_processamento"] = False
     else:
         # Quiz normal — mostra etapas e para
         executar_modo_quiz()
@@ -3674,7 +4035,8 @@ elif tipo_atendimento == "locacao":
             dados_loc, pdfs_loc, imovel=imovel_dados,
             dados_locador_direto=dados_locador_ext,
             dados_locatario_direto=dados_locatario_ext,
-            dados_fiador_direto=dados_fiador_ext if bytes_fiador else {}
+            dados_fiador_direto=dados_fiador_ext if bytes_fiador else {},
+            docs_classificados=st.session_state.get("quiz_docs_classificados")
         )
         barra.progress(100, text="✅ Documentação pronta!")
         time.sleep(0.4); barra.empty()
