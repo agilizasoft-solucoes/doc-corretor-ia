@@ -1545,8 +1545,10 @@ def calcular_checklist_locacao(nomes_pdfs, dados=None, imovel=None):
     if imovel:
         if imovel.get("finalidade"): ok.append("✅ Finalidade definida")
         else: faltando.append("❌ Finalidade do imóvel — obrigatória")
-        if imovel.get("area"):       ok.append(f"✅ Área informada ({imovel['area']}m²)")
-        else: faltando.append("❌ Área do imóvel — obrigatória para cláusula")
+        _modo_s = __import__("streamlit").session_state.get("quiz_modo_servico", "")
+        if _modo_s not in ("email_aluguel", "email_venda"):
+            if imovel.get("area"):   ok.append(f"✅ Área informada ({imovel['area']}m²)")
+            else: faltando.append("❌ Área do imóvel — obrigatória para cláusula")
         if imovel.get("fotos"):      ok.append(f"✅ Fotos anexadas ({imovel['fotos']} foto(s))")
         else: ok.append("⚠️ Fotos do imóvel — recomendado para vistoria")
         if imovel.get("vistoria_gerada"): ok.append("✅ Termo de vistoria gerado")
@@ -4005,7 +4007,8 @@ elif tipo_atendimento == "locacao":
           st.markdown(f"<span style='color:#C62828;font-size:12px;font-weight:600;'>{i}</span>", unsafe_allow_html=True)
 
   # ── UI do painel — só renderiza no modo painel (não no quiz) ──
-  if not _vindo_do_quiz:
+  _veio_do_quiz = bool(st.session_state.get("quiz_modo_servico"))
+  if not _vindo_do_quiz and not _veio_do_quiz:
 
    # ── BLOCO 01 — LOCADOR ──
    with st.container(border=True):
@@ -4305,9 +4308,9 @@ elif tipo_atendimento == "locacao":
       "pix_dados": pix_dados,
   })
 
-  # Validação de área obrigatória
+  # Validação de área obrigatória — só para contratos
   area_val = imovel_dados.get("area", "")
-  if finalidade_imovel and not area_val:
+  if finalidade_imovel and not area_val and not _veio_do_quiz:
       st.warning("⚠️ Área do imóvel é obrigatória para gerar o contrato.")
 
   # ── BLOCO 09 — Intermediação Imobiliária ──
@@ -4418,7 +4421,7 @@ elif tipo_atendimento == "locacao":
           "aviso_rescisao":  aviso_interm,
       }
 
-  if not _vindo_do_quiz:
+  if not _vindo_do_quiz and not _veio_do_quiz:
       imovel_dados["intermediacao"] = interm_dados
       st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
       processar_loc = st.button("⚡  ANALISAR DOCUMENTAÇÃO DO INQUILINO", type="primary", use_container_width=True, key="btn_processar_locacao")
