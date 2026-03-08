@@ -4057,8 +4057,8 @@ elif tipo_atendimento == "locacao":
           else:
               st.caption(f"📎 {len(upload_locador)} arquivo(s) do locador selecionado(s)")
 
-  # Quando quiz ativo — não renderiza o painel, vai direto para resultados
-  if _quiz_ativo:
+  # Quando quiz ativo e ainda não processou — não renderiza o painel, para aqui
+  if _quiz_ativo and not st.session_state.get("processado_loc"):
       st.stop()
 
   # ── BLOCO 02 — LOCATÁRIO ──
