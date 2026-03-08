@@ -3770,7 +3770,7 @@ elif tipo_atendimento == "locacao":
         erros_bloqueio.append("📂 Envie os documentos do **LOCATÁRIO** (Bloco 02)")
     if tem_fiador and not upload_fiador:
         erros_bloqueio.append("📂 Garantia = Fiador: envie os documentos do **FIADOR** (Bloco 03)")
-    if finalidade_imovel and not imovel_dados.get("area"):
+    if finalidade_imovel and not imovel_dados.get("area") and st.session_state.get("quiz_modo_servico","").startswith("contrato"):
         erros_bloqueio.append("📐 Informe a **área do imóvel** (obrigatória para a cláusula contratual)")
 
     if erros_bloqueio:
