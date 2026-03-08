@@ -2683,115 +2683,155 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-# ── SELEÇÃO DE TIPO DE ATENDIMENTO ──
-if "tipo_atendimento" not in st.session_state:
+# ── TELA INICIAL — 4 serviços ──────────────────────────────────
+if not st.session_state.get("quiz_modo_servico") \
+   and not st.session_state.get("processado_loc") \
+   and not st.session_state.get("processado"):
+
     st.markdown("""
-    <div style='max-width:560px;margin:32px auto 0 auto;background:#ffffff;
-         border-radius:16px;padding:36px 36px 28px 36px;
-         box-shadow:0 4px 20px rgba(0,0,0,0.08);text-align:center;'>
-        <div style='font-size:13px;font-weight:700;color:#1565C0;
-             text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;'>
-            Novo Atendimento
+    <div style='text-align:center;padding:8px 0 24px 0;'>
+        <div style='font-size:11px;font-weight:700;letter-spacing:0.12em;color:#9CA3AF;margin-bottom:6px;'>
+            NOVO ATENDIMENTO
         </div>
-        <div style='font-size:20px;font-weight:700;color:#1A1A2E;margin-bottom:6px;'>
-            Qual tipo de atendimento você deseja iniciar?
+        <div style='font-size:22px;font-weight:800;color:#1A1A2E;margin-bottom:4px;'>
+            O que você precisa fazer?
         </div>
-        <div style='font-size:14px;color:#5C6B7A;margin-bottom:28px;'>
-            Selecione abaixo para carregar o fluxo correto
+        <div style='font-size:14px;color:#6B7280;'>
+            Selecione o serviço para iniciar o fluxo
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    col_a, col_b = st.columns(2)
-    with col_a:
-        if st.button("🏠  Crédito Imobiliário", use_container_width=True, type="primary"):
-            st.session_state["tipo_atendimento"] = "credito"
-            st.rerun()
-        st.markdown("<div style='text-align:center;font-size:12px;color:#5C6B7A;margin-top:6px;'>Venda · Financiamento · FGTS</div>", unsafe_allow_html=True)
-    with col_b:
-        if st.button("🔑  Locação", use_container_width=True):
-            st.session_state["tipo_atendimento"] = "locacao"
-            st.session_state["modo_interface"] = "quiz"
-            st.session_state["etapa_quiz"] = 1
-            st.rerun()
-        st.markdown("<div style='text-align:center;font-size:12px;color:#5C6B7A;margin-top:6px;'>Aluguel · Análise de Inquilino</div>", unsafe_allow_html=True)
+    # ── LOCAÇÃO ───────────────────────────────────────────────────
+    st.markdown("""
+    <div style='display:flex;align-items:center;gap:10px;margin:0 0 10px 0;'>
+        <span style='font-size:11px;font-weight:700;letter-spacing:0.1em;color:#6B7280;'>LOCAÇÃO</span>
+        <div style='flex:1;height:1px;background:#E5E7EB;'></div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    # ── Histórico de Atendimentos ──
+    _c1, _c2 = st.columns(2)
+    with _c1:
+        st.markdown("""
+        <div style='background:white;border:1.5px solid #DBEAFE;border-radius:14px;
+                    padding:20px 20px 14px 20px;margin-bottom:4px;'>
+            <div style='font-size:28px;margin-bottom:8px;'>📧</div>
+            <div style='font-size:15px;font-weight:700;color:#1A1A2E;margin-bottom:2px;'>Enviar Email</div>
+            <div style='font-size:12px;font-weight:700;color:#1565C0;margin-bottom:8px;'>ALUGUEL</div>
+            <div style='font-size:12px;color:#6B7280;line-height:1.5;'>
+                Análise de inquilino · Organiza documentos e monta email profissional
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Selecionar →", use_container_width=True, key="ini_email_aluguel"):
+            st.session_state["quiz_modo_servico"] = "email_aluguel"
+            st.session_state["tipo_atendimento"]  = "locacao"
+            st.session_state["modo_interface"]    = "quiz"
+            st.session_state["etapa_quiz"]        = 2
+            st.rerun()
+
+    with _c2:
+        st.markdown("""
+        <div style='background:white;border:1.5px solid #D1FAE5;border-radius:14px;
+                    padding:20px 20px 14px 20px;margin-bottom:4px;'>
+            <div style='font-size:28px;margin-bottom:8px;'>📄</div>
+            <div style='font-size:15px;font-weight:700;color:#1A1A2E;margin-bottom:2px;'>Gerar Contrato</div>
+            <div style='font-size:12px;font-weight:700;color:#2E7D32;margin-bottom:8px;'>ALUGUEL</div>
+            <div style='font-size:12px;color:#6B7280;line-height:1.5;'>
+                Contrato completo com cláusulas, termo de vistoria e condições financeiras
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Selecionar →", use_container_width=True, key="ini_contrato_aluguel"):
+            st.session_state["quiz_modo_servico"] = "contrato_aluguel"
+            st.session_state["tipo_atendimento"]  = "locacao"
+            st.session_state["modo_interface"]    = "quiz"
+            st.session_state["etapa_quiz"]        = 2
+            st.rerun()
+
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+
+    # ── VENDA / FINANCIAMENTO ─────────────────────────────────────
+    st.markdown("""
+    <div style='display:flex;align-items:center;gap:10px;margin:0 0 10px 0;'>
+        <span style='font-size:11px;font-weight:700;letter-spacing:0.1em;color:#6B7280;'>VENDA / FINANCIAMENTO</span>
+        <div style='flex:1;height:1px;background:#E5E7EB;'></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    _c3, _c4 = st.columns(2)
+    with _c3:
+        st.markdown("""
+        <div style='background:white;border:1.5px solid #FEF3C7;border-radius:14px;
+                    padding:20px 20px 14px 20px;margin-bottom:4px;'>
+            <div style='font-size:28px;margin-bottom:8px;'>📧</div>
+            <div style='font-size:15px;font-weight:700;color:#1A1A2E;margin-bottom:2px;'>Enviar Email</div>
+            <div style='font-size:12px;font-weight:700;color:#B45309;margin-bottom:8px;'>VENDA</div>
+            <div style='font-size:12px;color:#6B7280;line-height:1.5;'>
+                Organização de documentos · Email para correspondente bancário
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Selecionar →", use_container_width=True, key="ini_email_venda"):
+            st.session_state["quiz_modo_servico"] = "email_venda"
+            st.session_state["tipo_atendimento"]  = "credito"
+            st.session_state["modo_interface"]    = "quiz"
+            st.session_state["etapa_quiz"]        = 2
+            st.rerun()
+
+    with _c4:
+        st.markdown("""
+        <div style='background:white;border:1.5px solid #EDE9FE;border-radius:14px;
+                    padding:20px 20px 14px 20px;margin-bottom:4px;'>
+            <div style='font-size:28px;margin-bottom:8px;'>📄</div>
+            <div style='font-size:15px;font-weight:700;color:#1A1A2E;margin-bottom:2px;'>Gerar Contrato</div>
+            <div style='font-size:12px;font-weight:700;color:#6D28D9;margin-bottom:8px;'>VENDA</div>
+            <div style='font-size:12px;color:#6B7280;line-height:1.5;'>
+                Contrato de compra e venda completo com todas as cláusulas jurídicas
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Selecionar →", use_container_width=True, key="ini_contrato_venda"):
+            st.session_state["quiz_modo_servico"] = "contrato_venda"
+            st.session_state["tipo_atendimento"]  = "credito"
+            st.session_state["modo_interface"]    = "quiz"
+            st.session_state["etapa_quiz"]        = 2
+            st.rerun()
+
+    # ── Histórico de Atendimentos ─────────────────────────────────
     _cli_hist = st.session_state.get("cliente", {})
     if _cli_hist.get("id"):
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
         st.divider()
-        with st.expander("📋 Histórico de Atendimentos", expanded=True):
+        with st.expander("📋 Histórico de Atendimentos", expanded=False):
             _hist = buscar_historico(_cli_hist["id"], limite=30)
             if _hist:
                 _cores_tipo  = {"Locação":"#2E7D32","Crédito Imobiliário":"#1565C0"}
-                _cores_score = {"BAIXO":"#2E7D32","MÉDIO":"#E65100","ALTO":"#C62828"}
-                _cores_status = {
-                    "Em andamento": "#E65100",
-                    "Contrato Gerado": "#1565C0",
-                    "Email Enviado": "#2E7D32",
-                    "Finalizado": "#555",
-                }
                 for _h in _hist:
                     _tipo_h    = _h.get("tipo","?")
                     _cor_h     = _cores_tipo.get(_tipo_h,"#555")
                     _nome_loct = _h.get("nome_locatario","") or "—"
-                    _nome_loc  = _h.get("nome_locador","")  or "—"
                     _data_h    = _h.get("criado_em","")[:10]
                     _hora_h    = _h.get("criado_em","")[11:16]
-                    _status_h  = _h.get("status","?")
-                    _cor_st    = _cores_status.get(_status_h,"#888")
-                    _end_h     = _h.get("endereco_imovel","")
-                    _val_h     = _h.get("valor_aluguel","")
-                    _score_h   = _h.get("score_risco")
-                    _cont_h    = _h.get("contrato_gerado", False)
-                    _email_h   = _h.get("email_enviado",  False)
-
-                    # badges contrato e email
-                    _badge_cont  = "<span style='background:#1565C0;color:white;font-size:9px;padding:1px 6px;border-radius:8px;margin-left:4px;'>📄 Contrato</span>" if _cont_h else ""
-                    _badge_email = "<span style='background:#2E7D32;color:white;font-size:9px;padding:1px 6px;border-radius:8px;margin-left:4px;'>📧 Email enviado</span>" if _email_h else ""
-
-                    # score
-                    _score_txt = ""
-                    if _score_h is not None:
-                        _nivel_h = "BAIXO" if _score_h >= 70 else ("MÉDIO" if _score_h >= 40 else "ALTO")
-                        _cor_sh  = _cores_score[_nivel_h]
-                        _score_txt = f"<span style='color:{_cor_sh};font-weight:700;font-size:11px;'>● {_nivel_h} ({_score_h}/100)</span> &nbsp;"
-
-                    # linha de detalhes
-                    _detalhes = []
-                    if _end_h:  _detalhes.append(f"🏠 {_end_h}")
-                    if _val_h:  _detalhes.append(f"R$ {_val_h}")
-                    _det_txt = " &nbsp;·&nbsp; ".join(_detalhes)
-
                     st.markdown(
-                        f"<div style='border-left:3px solid {_cor_h};padding:10px 14px;"
-                        f"margin-bottom:8px;border-radius:0 8px 8px 0;background:#FAFAFA;'>"
-                        f"<div style='display:flex;justify-content:space-between;align-items:center;'>"
-                        f"<span style='font-size:12px;font-weight:700;color:{_cor_h};'>{_tipo_h}</span>"
-                        f"<span style='font-size:10px;color:#888;'>{_data_h} {_hora_h}</span>"
-                        f"</div>"
-                        f"<div style='font-size:13px;font-weight:600;color:#1A1A2E;margin:3px 0 2px 0;'>"
-                        f"🔑 {_nome_loct} &nbsp;<span style='font-size:11px;color:#5C6B7A;font-weight:400;'>"
-                        f"(Loc: {_nome_loc})</span></div>"
-                        f"<div style='font-size:11px;color:#5C6B7A;margin-bottom:4px;'>{_det_txt}</div>"
-                        f"<div style='display:flex;align-items:center;gap:4px;flex-wrap:wrap;'>"
-                        f"{_score_txt}"
-                        f"<span style='font-size:10px;font-weight:700;color:{_cor_st};'>{_status_h}</span>"
-                        f"{_badge_cont}{_badge_email}"
-                        f"</div></div>",
-                        unsafe_allow_html=True)
+                        f"<div style='display:flex;justify-content:space-between;align-items:center;"
+                        f"padding:8px 12px;border-radius:8px;border:1px solid #E5E7EB;margin-bottom:6px;'>"
+                        f"<div><span style='background:{_cor_h};color:white;font-size:10px;font-weight:700;"
+                        f"padding:2px 8px;border-radius:10px;margin-right:8px;'>{_tipo_h}</span>"
+                        f"<span style='font-size:13px;color:#1A1A2E;'>{_nome_loct}</span></div>"
+                        f"<span style='font-size:11px;color:#9CA3AF;'>{_data_h} {_hora_h}</span></div>",
+                        unsafe_allow_html=True
+                    )
             else:
-                st.caption("Nenhum atendimento registrado ainda — processe o primeiro para começar.")
+                st.caption("Nenhum atendimento registrado ainda.")
 
-    # ── Barra de conta (tela inicial) ──
     st.divider()
-    _bi_e, _bi_cfg, _bi_sup, _bi_out = st.columns([1, 2, 2, 2])
-
-    with _bi_cfg:
+    _bc1, _bc2, _bc3 = st.columns(3)
+    with _bc1:
         with st.popover("⚙️ Configurar Email", use_container_width=True):
             st.caption("**Configuração de envio de email**")
             _cfg_d = st.text_input("📧 Email destino",         value=st.session_state.get("cfg_destino",""),   placeholder="destinatario@email.com", key="cfg_d_home")
-            _cfg_r = st.text_input("📤 Seu Gmail (remetente)", value=st.session_state.get("cfg_remetente",""), placeholder="seuemail@gmail.com",     key="cfg_r_home")
+            _cfg_r = st.text_input("📤 Seu Gmail (remetente)", value=st.session_state.get("cfg_remetente",""), placeholder="seuemail@gmail.com",      key="cfg_r_home")
             _cfg_s = st.text_input("🔑 Senha de app Gmail",    value=st.session_state.get("cfg_senha",""),     type="password", placeholder="Senha de app Google", key="cfg_s_home")
             st.caption("💡 myaccount.google.com → Segurança → Senhas de app")
             if st.button("💾 Salvar", use_container_width=True, key="salvar_cfg_home"):
@@ -2799,50 +2839,18 @@ if "tipo_atendimento" not in st.session_state:
                 st.session_state["cfg_remetente"] = _cfg_r
                 st.session_state["cfg_senha"]     = _cfg_s
                 st.success("✅ Salvo!")
-
-    with _bi_sup:
+    with _bc2:
         with st.popover("🔧 Suporte Técnico", use_container_width=True):
-            st.caption("**Diagnóstico técnico**")
-            st.caption("Baixe e envie ao suporte.")
-            import sys, platform
-            from datetime import datetime as _dth
-            _diag = [
-                "=" * 60,
-                "RELATÓRIO DE DIAGNÓSTICO — ImobFlow",
-                f"Gerado em: {_dth.now().strftime('%d/%m/%Y %H:%M:%S')}",
-                "=" * 60,
-                "\n[ AMBIENTE ]",
-                f"Python: {sys.version.split()[0]}",
-                f"Plataforma: {platform.system()} {platform.release()}",
-            ]
-            try:
-                import streamlit as _st2; _diag.append(f"Streamlit: {_st2.__version__}")
-            except: pass
-            _cli_d = st.session_state.get("cliente", {})
-            _diag += [
-                "\n[ CLIENTE ]",
-                f"Login: {_cli_d.get('login','?')} | Plano: {_cli_d.get('plano','free')}",
-                f"Vencimento: {_cli_d.get('data_vencimento','?')}",
-                "\n[ ERROS ]",
-            ]
-            _errs = st.session_state.get("erros_sistema", [])
-            for _er in _errs: _diag.append(f"  ⚠ {_er}")
-            if not _errs: _diag.append("(nenhum)")
-            _diag.append("\n" + "=" * 60)
-            st.download_button("⬇️ Baixar .txt", data="\n".join(_diag).encode("utf-8"),
-                file_name=f"diag_{_dth.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                mime="text/plain", use_container_width=True, key="dl_diag_home")
-
-    with _bi_out:
+            st.caption("Entre em contato com o suporte.")
+    with _bc3:
         if st.button("🚪 Sair da conta", use_container_width=True, key="sair_home"):
-            for _k in ["autenticado","cliente","cfg_destino","cfg_remetente","cfg_senha",
-                       "pdfs_gerados","email_gerado","processado","dados",
-                       "pdfs_gerados_loc","email_gerado_loc","processado_loc","dados_loc","tipo_atendimento"]:
+            for _k in list(st.session_state.keys()):
                 st.session_state.pop(_k, None)
             st.query_params.clear()
             st.rerun()
 
     st.stop()
+
 
 # ══════════════════════════════════════════════════════════════════
 # MODO ASSISTENTE (QUIZ) — camada de interface acima da lógica atual
