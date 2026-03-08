@@ -3119,7 +3119,7 @@ def quiz_etapa_40():
 
         col_mat, _ = st.columns(2)
         with col_mat:
-            st.text_input("Matrícula do imóvel (opcional)", placeholder="Ex: 12.345", key="mat_imovel")
+            st.text_input("Matrícula do imóvel (opcional)", placeholder="Ex: 12.345", key="q_mat_imovel")
 
         st.markdown("<div style='font-size:13px;font-weight:600;color:#1A1A2E;margin:10px 0 6px 0;'>📍 Endereço do imóvel</div>", unsafe_allow_html=True)
         col_e1, col_e2 = st.columns([3,1])
@@ -3133,80 +3133,80 @@ def quiz_etapa_40():
         if finalidade == "Residencial":
             st.markdown("<div style='background:#F0F7F0;border-radius:8px;padding:14px;margin-top:10px;'>", unsafe_allow_html=True)
             c1, c2 = st.columns(2)
-            with c1: st.selectbox("Tipo", ["Casa","Apartamento","Kitnet","Cobertura","Studio","Sobrado","Flat"], key="tipo_res")
-            with c2: st.number_input("Área (m²) *", min_value=0.0, step=1.0, key="area_res")
+            with c1: st.selectbox("Tipo", ["Casa","Apartamento","Kitnet","Cobertura","Studio","Sobrado","Flat"], key="q_tipo_res")
+            with c2: st.number_input("Área (m²) *", min_value=0.0, step=1.0, key="q_area_res")
             c3,c4,c5,c6 = st.columns(4)
-            with c3: st.number_input("Quartos",   min_value=0, step=1, key="quartos_r")
-            with c4: st.number_input("Suítes",    min_value=0, step=1, key="suites_r")
-            with c5: st.number_input("Banheiros", min_value=0, step=1, key="banhos_r")
-            with c6: st.number_input("Salas",     min_value=0, step=1, key="salas_r")
+            with c3: st.number_input("Quartos",   min_value=0, step=1, key="q_quartos_r")
+            with c4: st.number_input("Suítes",    min_value=0, step=1, key="q_suites_r")
+            with c5: st.number_input("Banheiros", min_value=0, step=1, key="q_banhos_r")
+            with c6: st.number_input("Salas",     min_value=0, step=1, key="q_salas_r")
             c7, c8 = st.columns(2)
-            with c7: st.number_input("Vagas", min_value=0, step=1, key="vagas_r")
-            with c8: st.selectbox("Mobiliado", ["Não","Parcial","Total"], key="mob_r")
+            with c7: st.number_input("Vagas", min_value=0, step=1, key="q_vagas_r")
+            with c8: st.selectbox("Mobiliado", ["Não","Parcial","Total"], key="q_mob_r")
             st.markdown("</div>", unsafe_allow_html=True)
         else:
             st.markdown("<div style='background:#F0F4FF;border-radius:8px;padding:14px;margin-top:10px;'>", unsafe_allow_html=True)
             c1, c2 = st.columns(2)
-            with c1: st.selectbox("Tipo", ["Sala comercial","Loja","Galpão","Consultório","Coworking","Pavilhão","Conjunto comercial"], key="tipo_com")
-            with c2: st.number_input("Área (m²) *", min_value=0.0, step=1.0, key="area_com")
+            with c1: st.selectbox("Tipo", ["Sala comercial","Loja","Galpão","Consultório","Coworking","Pavilhão","Conjunto comercial"], key="q_tipo_com")
+            with c2: st.number_input("Área (m²) *", min_value=0.0, step=1.0, key="q_area_com")
             c3,c4,c5 = st.columns(3)
-            with c3: st.number_input("Salas internas", min_value=0, step=1, key="salas_c")
-            with c4: st.number_input("Banheiros",      min_value=0, step=1, key="banhos_c")
-            with c5: st.number_input("Vagas",          min_value=0, step=1, key="vagas_c")
-            st.text_input("Atividade permitida", placeholder="Ex: Comércio varejista", key="ativ_c")
+            with c3: st.number_input("Salas internas", min_value=0, step=1, key="q_salas_c")
+            with c4: st.number_input("Banheiros",      min_value=0, step=1, key="q_banhos_c")
+            with c5: st.number_input("Vagas",          min_value=0, step=1, key="q_vagas_c")
+            st.text_input("Atividade permitida", placeholder="Ex: Comércio varejista", key="q_ativ_c")
             st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("<div style='font-size:13px;font-weight:600;color:#1A1A2E;margin:14px 0 6px 0;'>📷 Fotos do imóvel <span style='font-weight:400;color:#9CA3AF;font-size:12px;'>(opcional)</span></div>", unsafe_allow_html=True)
-        st.file_uploader("Fotos", accept_multiple_files=True, type=["jpg","jpeg","png","webp","bmp"], key="fotos_imovel", label_visibility="collapsed")
+        st.file_uploader("Fotos", accept_multiple_files=True, type=["jpg","jpeg","png","webp","bmp"], key="q_fotos_imovel", label_visibility="collapsed")
 
         st.markdown("<div style='font-size:13px;font-weight:600;color:#1A1A2E;margin:14px 0 6px 0;'>💰 Condições financeiras</div>", unsafe_allow_html=True)
         cv, cvenc = st.columns(2)
-        with cv:   st.number_input("Valor do aluguel (R$)", min_value=0.0, step=50.0, format="%.2f", key="valor_aluguel")
-        with cvenc: st.number_input("Dia de vencimento", min_value=1, max_value=28, value=5, key="dia_vencimento")
+        with cv:   st.number_input("Valor do aluguel (R$)", min_value=0.0, step=50.0, format="%.2f", key="q_valor_aluguel")
+        with cvenc: st.number_input("Dia de vencimento", min_value=1, max_value=28, value=5, key="q_dia_vencimento")
         cpag, cdur = st.columns(2)
-        with cpag: st.selectbox("Forma de pagamento", ["PIX","Boleto","Transferência bancária","Dinheiro"], key="forma_pagamento")
-        with cdur: st.selectbox("Duração", ["12 meses","24 meses","30 meses","36 meses","Indeterminado"], key="duracao_contrato")
-        st.date_input("Data de início", key="data_inicio_contrato")
+        with cpag: st.selectbox("Forma de pagamento", ["PIX","Boleto","Transferência bancária","Dinheiro"], key="q_forma_pagamento")
+        with cdur: st.selectbox("Duração", ["12 meses","24 meses","30 meses","36 meses","Indeterminado"], key="q_duracao_contrato")
+        st.date_input("Data de início", key="q_data_inicio_contrato")
 
         if st.session_state.get("forma_pagamento") == "PIX":
             st.markdown("<div style='background:#F0F7F0;border-radius:8px;padding:12px;margin-top:6px;'>", unsafe_allow_html=True)
             st.markdown("<div style='font-size:12px;font-weight:700;margin-bottom:6px;'>🔑 Dados PIX do Locador</div>", unsafe_allow_html=True)
             p1,p2 = st.columns(2)
             with p1:
-                st.text_input("Chave PIX", placeholder="CPF, e-mail, telefone ou aleatória", key="pix_chave")
-                st.text_input("Nome do favorecido", key="pix_favorecido")
+                st.text_input("Chave PIX", placeholder="CPF, e-mail, telefone ou aleatória", key="q_pix_chave")
+                st.text_input("Nome do favorecido", key="q_pix_favorecido")
             with p2:
-                st.text_input("Banco", placeholder="Ex: Nubank, Caixa...", key="pix_banco")
-                st.selectbox("Tipo de chave", ["CPF","CNPJ","E-mail","Telefone","Chave aleatória"], key="pix_tipo")
+                st.text_input("Banco", placeholder="Ex: Nubank, Caixa...", key="q_pix_banco")
+                st.selectbox("Tipo de chave", ["CPF","CNPJ","E-mail","Telefone","Chave aleatória"], key="q_pix_tipo")
             st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("<div style='font-size:13px;font-weight:600;color:#1A1A2E;margin:14px 0 4px 0;'>📤 Para quem vai a documentação?</div>", unsafe_allow_html=True)
-        st.text_input("", placeholder="Ex: Imobiliária Central, Sr. João...", key="nome_dest_locacao", label_visibility="collapsed")
+        st.text_input("", placeholder="Ex: Imobiliária Central, Sr. João...", key="q_nome_dest_locacao", label_visibility="collapsed")
 
         st.markdown("<div style='font-size:13px;font-weight:600;color:#1A1A2E;margin:14px 0 4px 0;'>🤝 Intermediação <span style='font-weight:400;color:#9CA3AF;font-size:12px;'>(opcional)</span></div>", unsafe_allow_html=True)
         tem_interm = st.checkbox("Há corretor ou imobiliária intermediando?", key="quiz_tem_interm")
         if tem_interm:
             with st.container(border=True):
                 i1,i2 = st.columns(2)
-                with i1: st.selectbox("Tipo", ["Corretor Autônomo","Imobiliária","Correspondente Imobiliário"], key="tipo_interm")
-                with i2: st.text_input("CRECI / CNPJ", placeholder="Ex: 12345-F", key="creci_interm")
+                with i1: st.selectbox("Tipo", ["Corretor Autônomo","Imobiliária","Correspondente Imobiliário"], key="q_tipo_interm")
+                with i2: st.text_input("CRECI / CNPJ", placeholder="Ex: 12345-F", key="q_creci_interm")
                 i3,i4 = st.columns(2)
-                with i3: st.text_input("Nome / Razão social", key="nome_interm")
-                with i4: st.text_input("CPF / CNPJ", placeholder="000.000.000-00", key="cpf_cnpj_interm")
+                with i3: st.text_input("Nome / Razão social", key="q_nome_interm")
+                with i4: st.text_input("CPF / CNPJ", placeholder="000.000.000-00", key="q_cpf_cnpj_interm")
                 i5,i6 = st.columns(2)
-                with i5: st.text_input("Telefone", key="tel_interm")
-                with i6: st.text_input("E-mail", key="email_interm")
+                with i5: st.text_input("Telefone", key="q_tel_interm")
+                with i6: st.text_input("E-mail", key="q_email_interm")
                 i7,i8 = st.columns(2)
-                with i7: st.selectbox("Modelo comissão", ["1º aluguel integral","Percentual","Valor fixo"], key="modelo_comissao")
+                with i7: st.selectbox("Modelo comissão", ["1º aluguel integral","Percentual","Valor fixo"], key="q_modelo_comissao")
                 with i8: st.text_input("Valor / %", placeholder="Ex: 100% ou R$ 1.200", key="valor_comissao_str")
-                tem_adm = st.checkbox("Taxa de administração mensal?", key="tem_adm")
+                tem_adm = st.checkbox("Taxa de administração mensal?", key="q_tem_adm")
                 if tem_adm:
                     a1,a2 = st.columns(2)
                     with a1: st.text_input("Taxa", placeholder="Ex: 10%", key="taxa_adm_str")
-                    with a2: st.multiselect("Serviços", ["Cobrança","Repasse","Vistoria","Renovação","Jurídico"], key="servicos_adm")
+                    with a2: st.multiselect("Serviços", ["Cobrança","Repasse","Vistoria","Renovação","Jurídico"], key="q_servicos_adm")
                 v1,v2 = st.columns(2)
-                with v1: st.text_input("Vigência", placeholder="Mesma do contrato", key="vigencia_interm")
-                with v2: st.text_input("Aviso prévio", placeholder="30 dias", key="aviso_interm")
+                with v1: st.text_input("Vigência", placeholder="Mesma do contrato", key="q_vigencia_interm")
+                with v2: st.text_input("Aviso prévio", placeholder="30 dias", key="q_aviso_interm")
 
         area_ok = (st.session_state.get("area_res",0) or 0) > 0 if finalidade == "Residencial" else (st.session_state.get("area_com",0) or 0) > 0
 
@@ -4978,7 +4978,7 @@ else:
             )
 
     with _clogout:
-        if st.button("🚪 Sair da conta", use_container_width=True, key="sair_rodape"):
+        if st.button("🚪 Sair da conta", use_container_width=True, key="sair_rodape2"):
             for k in ["autenticado","cliente","cfg_destino","cfg_remetente","cfg_senha",
                       "pdfs_gerados","email_gerado","processado","dados",
                       "pdfs_gerados_loc","email_gerado_loc","processado_loc","dados_loc","tipo_atendimento"]:
