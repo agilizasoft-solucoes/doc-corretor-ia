@@ -970,7 +970,7 @@ _CATEGORIA_DOC = {
 # Docs obrigatórios por polo
 _OBRIGATORIOS = {
     "locatario": ["identidade", "renda", "residencia"],
-    "locador":   ["identidade", "residencia"],
+    "locador":   [],   # só texto de contexto já basta
     "fiador":    ["identidade", "renda", "residencia"],
 }
 
@@ -1133,40 +1133,49 @@ RETORNE APENAS JSON válido, sem markdown:
                 for d in todos_bytes]
 
 
-def validar_checklist_locacao(docs_classificados, tem_fiador=False):
+def validar_checklist_locacao(docs_classificados, tem_fiador=False, texto_contexto=""):
     """
-    Recebe a lista classificada e retorna um dict com o resultado da validação.
-    {
-      "ok": True/False,
-      "polos": {
-        "locatario": {"ok": True, "presentes": [...], "faltando": [...]},
-        ...
-      }
-    }
+    Valida documentos obrigatórios cruzando arquivos + texto de contexto.
+    Só bloqueia se a informação não estiver em lugar nenhum.
     """
     polos_checar = ["locatario", "locador"]
     if tem_fiador:
         polos_checar.append("fiador")
 
+    ctx = parsear_contexto_partes(texto_contexto) if texto_contexto else {}
     resultado = {"ok": True, "polos": {}}
 
     for polo in polos_checar:
         obrigatorios = _OBRIGATORIOS[polo]
-        # Categorias presentes para este polo
+
+        # Locador (e qualquer polo sem obrigatórios) passa sempre
+        if not obrigatorios:
+            resultado["polos"][polo] = {"ok": True, "presentes": [], "no_texto": [], "faltando": []}
+            continue
+        info_ctx = ctx.get(polo, {})
+
+        # Categorias presentes nos arquivos
         cats_presentes = set(
             d["categoria"] for d in docs_classificados
             if d["polo"] == polo and d["categoria"] != "outro"
         )
-        # CNH cobre identidade E cpf
         if "identidade" in cats_presentes:
             cats_presentes.add("cpf")
 
-        faltando = [_LABELS_CAT[c] for c in obrigatorios if c not in cats_presentes]
+        # O que o texto de contexto já cobre
+        cats_no_texto = set()
+        if info_ctx.get("endereco_hint"):
+            cats_no_texto.add("residencia")
+
+        # Só bloqueia se não estiver nem nos docs nem no texto
+        cats_cobertas = cats_presentes | cats_no_texto
+        faltando = [_LABELS_CAT[c] for c in obrigatorios if c not in cats_cobertas]
         ok_polo  = len(faltando) == 0
 
         resultado["polos"][polo] = {
             "ok":        ok_polo,
             "presentes": [_LABELS_CAT.get(c, c) for c in cats_presentes if c in _LABELS_CAT],
+            "no_texto":  [k for k in ["email","telefone","endereco_hint"] if info_ctx.get(k)],
             "faltando":  faltando,
         }
         if not ok_polo:
@@ -3373,7 +3382,7 @@ if _modo_interface == "quiz" and tipo_atendimento == "locacao":
             else:
                 _classificados = st.session_state["quiz_docs_classificados"]
 
-            _validacao = validar_checklist_locacao(_classificados, _tem_fiador)
+            _validacao = validar_checklist_locacao(_classificados, _tem_fiador, _texto_ctx)
 
             if not _validacao["ok"]:
                 st.session_state["quiz_iniciar_processamento"] = False
