@@ -971,7 +971,7 @@ _CATEGORIA_DOC = {
 _OBRIGATORIOS = {
     "locatario": ["identidade", "renda", "residencia"],
     "locador":   ["identidade", "residencia"],
-    "fiador":    ["identidade", "renda", "residencia", "imovel_proprio"],
+    "fiador":    ["identidade", "renda", "residencia"],
 }
 
 _LABELS_CAT = {
