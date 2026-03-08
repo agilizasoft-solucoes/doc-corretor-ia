@@ -3013,45 +3013,153 @@ def executar_modo_quiz():
 
 # ══════════════════════════════════════════════════════════════════
 
-tipo_atendimento = st.session_state.get("tipo_atendimento", "credito")
+tipo_atendimento   = st.session_state.get("tipo_atendimento", "")
+_modo_interface    = st.session_state.get("modo_interface", "quiz")
+_quiz_modo_servico = st.session_state.get("quiz_modo_servico", "")
 
-# ── Seletor de modo (Painel completo vs Assistente guiado) ──
-badge_cor  = "#1565C0" if tipo_atendimento == "credito" else "#2E7D32"
-badge_txt  = "🏠 Crédito Imobiliário" if tipo_atendimento == "credito" else "🔑 Locação"
+# ══════════════════════════════════════════════════════════════════
+# TELA INICIAL — 4 serviços (só aparece quando nada foi selecionado)
+# ══════════════════════════════════════════════════════════════════
+_servico_escolhido = bool(_quiz_modo_servico)
 
-_col_badge, _col_modo = st.columns([1, 2])
-with _col_badge:
-    st.markdown(f"""
-    <span style='background:{badge_cor};color:white;font-size:11px;font-weight:700;
-          padding:3px 12px;border-radius:20px;letter-spacing:0.5px;
-          display:inline-block;margin-top:6px;'>
-        {badge_txt}
-    </span>
+if not _servico_escolhido and not st.session_state.get("processado_loc") and not st.session_state.get("processado"):
+
+    st.markdown("""
+    <div style='text-align:center;padding:8px 0 24px 0;'>
+        <div style='font-size:11px;font-weight:700;letter-spacing:0.12em;color:#9CA3AF;margin-bottom:6px;'>
+            NOVO ATENDIMENTO
+        </div>
+        <div style='font-size:22px;font-weight:800;color:#1A1A2E;margin-bottom:4px;'>
+            O que você precisa fazer?
+        </div>
+        <div style='font-size:14px;color:#6B7280;'>
+            Selecione o serviço para iniciar o fluxo
+        </div>
+    </div>
     """, unsafe_allow_html=True)
 
-with _col_modo:
-    _modo_atual = st.session_state.get("modo_interface", "painel")
-    _m1, _m2 = st.columns(2)
-    with _m1:
-        _class1 = "modo-btn-ativo" if _modo_atual == "painel" else "modo-btn-inativo"
-        st.markdown(f"<div class='{_class1}'>", unsafe_allow_html=True)
-        if st.button("📋 Painel completo", use_container_width=True, key="modo_painel"):
-            st.session_state["modo_interface"] = "painel"
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
-    with _m2:
-        _class2 = "modo-btn-ativo" if _modo_atual == "quiz" else "modo-btn-inativo"
-        st.markdown(f"<div class='{_class2}'>", unsafe_allow_html=True)
-        if st.button("🧭 Assistente guiado", use_container_width=True, key="modo_quiz"):
-            st.session_state["modo_interface"] = "quiz"
-            if "etapa_quiz" not in st.session_state:
-                st.session_state["etapa_quiz"] = 1
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+    # ── Linha LOCAÇÃO ─────────────────────────────────────────────
+    st.markdown("""
+    <div style='display:flex;align-items:center;gap:10px;margin:0 0 10px 0;'>
+        <span style='font-size:11px;font-weight:700;letter-spacing:0.1em;color:#6B7280;'>LOCAÇÃO</span>
+        <div style='flex:1;height:1px;background:#E5E7EB;'></div>
+    </div>
+    """, unsafe_allow_html=True)
 
-if st.button("↩ Trocar tipo de atendimento", key="trocar_tipo", use_container_width=True):
-    for key in ["tipo_atendimento","pdfs_gerados","email_gerado","processado","dados",
-                "etapa_quiz","quiz_tipo_servico","quiz_garantia","quiz_tem_fiador",
+    col_ea, col_ca = st.columns(2)
+
+    with col_ea:
+        st.markdown("""
+        <div style='background:white;border:1.5px solid #DBEAFE;border-radius:14px;
+                    padding:20px 20px 14px 20px;margin-bottom:2px;cursor:pointer;
+                    transition:box-shadow 0.2s;'>
+            <div style='font-size:28px;margin-bottom:8px;'>📧</div>
+            <div style='font-size:15px;font-weight:700;color:#1A1A2E;margin-bottom:4px;'>
+                Enviar Email
+            </div>
+            <div style='font-size:12px;font-weight:600;color:#1565C0;margin-bottom:8px;'>
+                ALUGUEL
+            </div>
+            <div style='font-size:12px;color:#6B7280;line-height:1.5;'>
+                Análise de inquilino · Organiza documentos e monta email profissional
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Selecionar →", use_container_width=True, key="ini_email_aluguel"):
+            st.session_state["quiz_modo_servico"] = "email_aluguel"
+            st.session_state["tipo_atendimento"]  = "locacao"
+            st.session_state["modo_interface"]    = "quiz"
+            st.session_state["etapa_quiz"]        = 2
+            st.rerun()
+
+    with col_ca:
+        st.markdown("""
+        <div style='background:white;border:1.5px solid #D1FAE5;border-radius:14px;
+                    padding:20px 20px 14px 20px;margin-bottom:2px;'>
+            <div style='font-size:28px;margin-bottom:8px;'>📄</div>
+            <div style='font-size:15px;font-weight:700;color:#1A1A2E;margin-bottom:4px;'>
+                Gerar Contrato
+            </div>
+            <div style='font-size:12px;font-weight:600;color:#2E7D32;margin-bottom:8px;'>
+                ALUGUEL
+            </div>
+            <div style='font-size:12px;color:#6B7280;line-height:1.5;'>
+                Contrato completo com cláusulas, termo de vistoria e condições financeiras
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Selecionar →", use_container_width=True, key="ini_contrato_aluguel"):
+            st.session_state["quiz_modo_servico"] = "contrato_aluguel"
+            st.session_state["tipo_atendimento"]  = "locacao"
+            st.session_state["modo_interface"]    = "quiz"
+            st.session_state["etapa_quiz"]        = 2
+            st.rerun()
+
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+
+    # ── Linha VENDA ───────────────────────────────────────────────
+    st.markdown("""
+    <div style='display:flex;align-items:center;gap:10px;margin:0 0 10px 0;'>
+        <span style='font-size:11px;font-weight:700;letter-spacing:0.1em;color:#6B7280;'>VENDA / FINANCIAMENTO</span>
+        <div style='flex:1;height:1px;background:#E5E7EB;'></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col_ev, col_cv = st.columns(2)
+
+    with col_ev:
+        st.markdown("""
+        <div style='background:white;border:1.5px solid #FEF3C7;border-radius:14px;
+                    padding:20px 20px 14px 20px;margin-bottom:2px;'>
+            <div style='font-size:28px;margin-bottom:8px;'>📧</div>
+            <div style='font-size:15px;font-weight:700;color:#1A1A2E;margin-bottom:4px;'>
+                Enviar Email
+            </div>
+            <div style='font-size:12px;font-weight:600;color:#B45309;margin-bottom:8px;'>
+                VENDA
+            </div>
+            <div style='font-size:12px;color:#6B7280;line-height:1.5;'>
+                Organização de documentos · Email para correspondente bancário
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Selecionar →", use_container_width=True, key="ini_email_venda"):
+            st.session_state["quiz_modo_servico"] = "email_venda"
+            st.session_state["tipo_atendimento"]  = "credito"
+            st.session_state["modo_interface"]    = "quiz"
+            st.session_state["etapa_quiz"]        = 2
+            st.rerun()
+
+    with col_cv:
+        st.markdown("""
+        <div style='background:white;border:1.5px solid #EDE9FE;border-radius:14px;
+                    padding:20px 20px 14px 20px;margin-bottom:2px;'>
+            <div style='font-size:28px;margin-bottom:8px;'>📄</div>
+            <div style='font-size:15px;font-weight:700;color:#1A1A2E;margin-bottom:4px;'>
+                Gerar Contrato
+            </div>
+            <div style='font-size:12px;font-weight:600;color:#6D28D9;margin-bottom:8px;'>
+                VENDA
+            </div>
+            <div style='font-size:12px;color:#6B7280;line-height:1.5;'>
+                Contrato de compra e venda completo com todas as cláusulas jurídicas
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Selecionar →", use_container_width=True, key="ini_contrato_venda"):
+            st.session_state["quiz_modo_servico"] = "contrato_venda"
+            st.session_state["tipo_atendimento"]  = "credito"
+            st.session_state["modo_interface"]    = "quiz"
+            st.session_state["etapa_quiz"]        = 2
+            st.rerun()
+
+    st.stop()
+
+# ── Botão recomeçar (aparece quando já há serviço em andamento) ───
+if st.button("← Voltar ao início", key="trocar_tipo", use_container_width=True):
+    for key in ["tipo_atendimento","quiz_modo_servico","modo_interface",
+                "pdfs_gerados","email_gerado","processado","dados",
+                "etapa_quiz","quiz_garantia","quiz_tem_fiador",
                 "quiz_texto_contexto","quiz_todos_docs_bytes","quiz_imovel_dados",
                 "processado_loc","pdfs_gerados_loc","email_gerado_loc"]:
         st.session_state.pop(key, None)
@@ -3059,8 +3167,7 @@ if st.button("↩ Trocar tipo de atendimento", key="trocar_tipo", use_container_
 
 st.divider()
 
-# ── Se modo quiz ativo e é locação, executar o assistente ──
-_modo_interface = st.session_state.get("modo_interface", "painel")
+# ── Fluxo quiz ativo ──────────────────────────────────────────────
 if _modo_interface == "quiz" and tipo_atendimento == "locacao":
     _quiz_iniciar = st.session_state.get("quiz_iniciar_processamento", False)
     _processado_loc = st.session_state.get("processado_loc", False)
@@ -3148,12 +3255,6 @@ if _modo_interface == "quiz" and tipo_atendimento == "locacao":
         # Quiz normal — mostra etapas e para
         executar_modo_quiz()
         st.stop()
-elif _modo_interface == "quiz" and tipo_atendimento == "credito":
-    # Crédito: mostrar etapa 1 do quiz uma vez, depois redireciona ao painel
-    if not st.session_state.get("processado"):
-        if st.session_state.get("etapa_quiz", 1) == 1:
-            quiz_etapa_1()
-            st.stop()
 
 # ══════════════════════════════════════════════════════
 # FLUXO A — CRÉDITO IMOBILIÁRIO (existente, sem alteração)
