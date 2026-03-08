@@ -985,84 +985,94 @@ _LABELS_CAT = {
 
 def parsear_contexto_partes(texto_contexto):
     """
-    Parseia o texto de contexto do corretor e retorna dict com email/telefone por polo.
-    Exemplo de entrada:
-      locatario, Breno, email breno@gmail.com, telefone 81 99450-5765, Rua Berlim
-      locador, Annaic, email annaic@gmail.com, telefone 81 99798-932, Rua Padre José
-      fiador, José, email jose@gmail.com, telefone 81 98960-9411, Rua Joaquim
-
-    Retorna:
-      {
-        "locatario": {"nome": "Breno", "email": "breno@gmail.com", "telefone": "81 99450-5765", "endereco_hint": "Rua Berlim"},
-        "locador":   {...},
-        "fiador":    {...},
-      }
+    Detecta os nomes-chave (locador/proprietario, locatario, fiador) no texto
+    e coleta tudo que vem depois de cada um, independente do formato.
+    Extrai: nome, cpf, email, telefone, endereco_hint.
     """
     import re
-    resultado = {}
     if not texto_contexto:
-        return resultado
+        return {}
 
-    polos_map = {
-        "locatario": "locatario", "locatário": "locatario", "inquilino": "locatario",
-        "locador":   "locador",   "proprietario": "locador", "proprietário": "locador",
-        "fiador":    "fiador",    "garantidor": "fiador",
-    }
+    # Nomes-chave → polo
+    CHAVES = [
+        (r'locatári[oa]|locatari[oa]|inquilin[oa]',  "locatario"),
+        (r'locador|proprietári[oa]|proprietari[oa]',  "locador"),
+        (r'fiador|fiadora|garantidor',                "fiador"),
+    ]
 
-    for linha in texto_contexto.strip().split("\n"):
-        linha = linha.strip()
-        if not linha:
-            continue
+    def _fmt_tel(raw):
+        d = re.sub(r'[^\d]', '', raw)
+        if len(d) == 11: return f"({d[:2]}) {d[2:7]}-{d[7:]}"
+        if len(d) == 10: return f"({d[:2]}) {d[2:6]}-{d[6:]}"
+        return raw.strip()
 
-        # Detectar o polo pelo primeiro token
-        primeira = linha.split(",")[0].strip().lower()
-        polo = None
-        for key, val in polos_map.items():
-            if key in primeira:
-                polo = val
-                break
-        if not polo:
-            continue
+    def _fmt_cpf(raw):
+        d = re.sub(r'[^\d]', '', raw)
+        if len(d) == 11:
+            return f"{d[:3]}.{d[3:6]}.{d[6:9]}-{d[9:]}"
+        return raw.strip()
 
-        partes = [p.strip() for p in linha.split(",")]
-        info = {"nome": "", "email": "", "telefone": "", "endereco_hint": ""}
-
-        # Nome: segundo token
-        if len(partes) > 1:
-            info["nome"] = partes[1].strip()
-
-        # Percorrer tokens buscando email, telefone, endereço
-        texto_completo = ", ".join(partes[2:]) if len(partes) > 2 else ""
+    def _extrair_info(bloco):
+        """Extrai email, telefone, CPF, nome e endereço de qualquer bloco de texto."""
+        info = {"nome": "", "cpf": "", "email": "", "telefone": "", "endereco_hint": ""}
 
         # Email
-        m_email = re.search(r'[\w.\-+]+@[\w.\-]+\.[a-zA-Z]{2,}', linha)
-        if m_email:
-            info["email"] = m_email.group(0)
+        m = re.search(r'[\w.\-+]+@[\w.\-]+\.[a-zA-Z]{2,}', bloco)
+        if m: info["email"] = m.group(0)
 
-        # Telefone — sequência de dígitos com possível formatação
-        m_tel = re.search(r'(?:telefone|tel|fone|whatsapp)[\s:]*([0-9\s\-().+]{8,20})', linha, re.IGNORECASE)
-        if m_tel:
-            tel_raw = re.sub(r'[^\d]', '', m_tel.group(1))
-            if len(tel_raw) >= 8:
-                # Formatar: (XX) XXXXX-XXXX
-                if len(tel_raw) == 11:
-                    info["telefone"] = f"({tel_raw[:2]}) {tel_raw[2:7]}-{tel_raw[7:]}"
-                elif len(tel_raw) == 10:
-                    info["telefone"] = f"({tel_raw[:2]}) {tel_raw[2:6]}-{tel_raw[6:]}"
-                else:
-                    info["telefone"] = tel_raw
+        # CPF (formato xxx.xxx.xxx-xx ou 11 dígitos)
+        m = re.search(r'\d{3}[\.\s]?\d{3}[\.\s]?\d{3}[\-\s]?\d{2}', bloco)
+        if m: info["cpf"] = _fmt_cpf(m.group(0))
 
-        # Endereço hint: último token que começa com Rua, Av, etc.
-        for p in partes:
-            p_clean = p.strip()
-            if re.match(r'^(rua|av\.|avenida|alameda|travessa|estrada|rod\.|rodovia)', p_clean, re.IGNORECASE):
-                info["endereco_hint"] = p_clean
+        # Telefone (com ou sem DDD)
+        m = re.search(r'\(?\d{2}\)?\s*\d{4,5}[\-\s]\d{4}', bloco)
+        if m: info["telefone"] = _fmt_tel(m.group(0))
+
+        # Endereço — linha que começa com Rua, Av, etc.
+        m = re.search(r'(rua|av\.?|avenida|alameda|travessa|estrada|rodovia)[^\n,]+', bloco, re.IGNORECASE)
+        if m: info["endereco_hint"] = m.group(0).strip()
+
+        # Nome — campo explícito ou segundo token antes de "email/telefone/rua"
+        m = re.search(r'nome\s+completo\s*[:\-]\s*([^\n\*]+)', bloco, re.IGNORECASE)
+        if m:
+            info["nome"] = m.group(1).strip()
+        else:
+            # Pegar texto entre o nome-chave e a primeira vírgula/dois-pontos/info
+            # Ex: "locatario, Breno, email..." → "Breno"
+            m2 = re.search(
+                rf'(?:locatári[oa]|locatari[oa]|inquilin[oa]|locador|proprietári[oa]|proprietari[oa]|fiador|garantidor)'
+                rf'\W+([^,\n\*@\d]+?)(?:\s*,|\s*\n|\s*email|\s*telefone|\s*cpf|$)',
+                bloco, re.IGNORECASE
+            )
+            if m2:
+                nome_raw = m2.group(1).strip().strip(',').strip()
+                if nome_raw and len(nome_raw) > 1:
+                    info["nome"] = nome_raw
+
+        return info
+
+    # ── Dividir o texto nos blocos por nome-chave ──
+    # Construir padrão que detecta qualquer nome-chave
+    padrao_chave = '|'.join(p for p, _ in CHAVES)
+    # Encontrar posições dos nomes-chave
+    blocos = {}
+    matches = list(re.finditer(rf'(?i)(?:^|[\n,\s])({padrao_chave})', texto_contexto))
+
+    for i, m in enumerate(matches):
+        inicio = m.start()
+        fim    = matches[i+1].start() if i+1 < len(matches) else len(texto_contexto)
+        bloco  = texto_contexto[inicio:fim]
+
+        # Identificar polo
+        polo = None
+        for padrao, nome_polo in CHAVES:
+            if re.search(padrao, m.group(1), re.IGNORECASE):
+                polo = nome_polo
                 break
+        if polo:
+            blocos[polo] = _extrair_info(bloco)
 
-        resultado[polo] = info
-
-    return resultado
-
+    return blocos
 
 def classificar_docs_por_tipo(todos_bytes, texto_contexto=""):
     """
@@ -2320,17 +2330,18 @@ RETORNE APENAS JSON válido (sem markdown, sem texto extra):
         if texto_bruto:
             _ctx = parsear_contexto_partes(texto_bruto)
             _info_polo = _ctx.get(polo, {})
-            # Email do contexto prevalece — já confirmado pelo corretor
-            if _info_polo.get("email") and not resultado.get("email"):
+            # Email do contexto prevalece sempre
+            if _info_polo.get("email"):
                 resultado["email"] = _info_polo["email"]
-            elif _info_polo.get("email"):
-                resultado["email"] = _info_polo["email"]  # sempre usa o do contexto
             # Telefone do contexto prevalece
             if _info_polo.get("telefone"):
                 resultado["telefone"] = _info_polo["telefone"]
-            # Nome: se IA não encontrou, usa o nome parcial do contexto
+            # Nome: se IA não encontrou, usa o do contexto
             if not resultado.get("nome_completo") and _info_polo.get("nome"):
                 resultado["nome_completo"] = _info_polo["nome"]
+            # CPF do contexto — preenche se IA não encontrou
+            if not resultado.get("cpf") and _info_polo.get("cpf"):
+                resultado["cpf"] = _info_polo["cpf"]
 
         return resultado
     except Exception as _e:
@@ -2341,9 +2352,10 @@ RETORNE APENAS JSON válido (sem markdown, sem texto extra):
         if texto_bruto:
             _ctx = parsear_contexto_partes(texto_bruto)
             _info = _ctx.get(polo, {})
-            if _info.get("email"):     _fallback["email"]    = _info["email"]
-            if _info.get("telefone"):  _fallback["telefone"] = _info["telefone"]
+            if _info.get("email"):     _fallback["email"]         = _info["email"]
+            if _info.get("telefone"):  _fallback["telefone"]      = _info["telefone"]
             if _info.get("nome"):      _fallback["nome_completo"] = _info["nome"]
+            if _info.get("cpf"):       _fallback["cpf"]           = _info["cpf"]
         return _fallback
 
 def mini_checklist_polo(dados, polo):
