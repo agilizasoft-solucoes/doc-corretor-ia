@@ -3022,10 +3022,33 @@ elif tipo_atendimento == "locacao":
                 pct += step
                 barra.progress(min(pct, 70), text=f"✅ {polo.capitalize()} extraído")
 
-        barra.progress(70, text="🔄 Convertendo e renomeando documentos...")
+        barra.progress(70, text="🔄 Convertendo e renomeando documentos por polo...")
 
-        # ── Renomear + converter via IA ──
-        docs_processados = processar_documentos(todos_bytes)
+        # ── Renomear + converter por polo ──
+        # O texto âncora diz quem é quem. A IA já extraiu os dados.
+        # Estratégia: processar_documentos separado por polo para manter organização.
+        # Como não há separação física dos arquivos por polo no upload único,
+        # processamos todos juntos mas depois agrupamos por nome identificado.
+
+        _nome_loct_norm = (dados_loct.get("nome_completo") or "").split()[0].lower() if dados_loct.get("nome_completo") else ""
+        _nome_locd_norm = (dados_locd.get("nome_completo") or "").split()[0].lower() if dados_locd.get("nome_completo") else ""
+        _nome_fiad_norm = (dados_fiad.get("nome_completo") or "").split()[0].lower() if dados_fiad.get("nome_completo") else ""
+
+        docs_todos = processar_documentos(todos_bytes)  # [(nome_final, bytes_pdf)]
+
+        # Classificar cada doc renomeado por polo pelo nome que a IA colocou
+        def _polo_do_nome(nome_doc):
+            n = nome_doc.lower()
+            if _nome_locd_norm and _nome_locd_norm in n:   return "locador"
+            if _nome_fiad_norm and _nome_fiad_norm in n:   return "fiador"
+            if _nome_loct_norm and _nome_loct_norm in n:   return "locatario"
+            return "locatario"  # default: locatário (quem mais tem docs)
+
+        docs_por_polo = {"locador": [], "locatario": [], "fiador": []}
+        for _nd, _bd in docs_todos:
+            docs_por_polo[_polo_do_nome(_nd)].append((_nd, _bd))
+
+        docs_processados = docs_todos  # lista flat para email
 
         barra.progress(88, text="✉️ Montando email...")
 
@@ -3062,6 +3085,7 @@ elif tipo_atendimento == "locacao":
             {"name": n, "bytes": b, "tipo": t} for n, b, t in todos_bytes
         ]
         st.session_state["ea_docs_processados"]  = docs_processados  # [(nome, bytes_pdf), ...]
+        st.session_state["ea_docs_por_polo"]      = docs_por_polo    # {"locador":[], "locatario":[], "fiador":[]}
         st.rerun()
 
     # ── Tela de RESULTADO (após processar) ──
@@ -3085,52 +3109,69 @@ elif tipo_atendimento == "locacao":
       """, unsafe_allow_html=True)
 
       # ── Dados extraídos por polo ──
-      # ── Documentos processados ──
-      _docs_proc = st.session_state.get("ea_docs_processados", [])
-      if _docs_proc:
-          st.markdown("#### 📂 Documentos organizados")
-          with st.container(border=True):
-              st.markdown(
-                  f"<div style='font-size:13px;color:#1B5E20;font-weight:600;margin-bottom:10px;'>"
-                  f"✅ {len(_docs_proc)} arquivo(s) convertido(s) e renomeado(s) pela IA</div>",
-                  unsafe_allow_html=True
-              )
-              # Linha por arquivo: ícone + nome + botão baixar
-              for _nome_doc, _bytes_doc in _docs_proc:
-                  _col_nome, _col_dl = st.columns([5, 1])
-                  with _col_nome:
-                      st.markdown(
-                          f"<div style='padding:6px 0;font-size:13px;'>📄 {_nome_doc}</div>",
-                          unsafe_allow_html=True
-                      )
-                  with _col_dl:
-                      st.download_button(
-                          "⬇️",
-                          data=_bytes_doc,
-                          file_name=_nome_doc,
-                          mime="application/pdf",
-                          key=f"dl_ea_{_nome_doc}",
-                          use_container_width=True
-                      )
+      # ── Documentos organizados por polo ──
+      _docs_por_polo = st.session_state.get("ea_docs_por_polo", {})
+      _docs_proc     = st.session_state.get("ea_docs_processados", [])
 
-              # ZIP com todos
-              if len(_docs_proc) > 1:
-                  import zipfile, io as _io
-                  _zip_buf = _io.BytesIO()
-                  with zipfile.ZipFile(_zip_buf, "w") as _zf:
-                      for _n, _b in _docs_proc:
-                          _zf.writestr(_n, _b)
-                  _zip_buf.seek(0)
-                  _nome_loct_zip = st.session_state.get("ea_dados_locatario", {}).get("nome_completo", "cliente")
-                  _nome_loct_zip = _nome_loct_zip.split()[0] if _nome_loct_zip else "cliente"
-                  st.download_button(
-                      f"⬇️ Baixar todos em ZIP ({len(_docs_proc)} arquivos)",
-                      data=_zip_buf,
-                      file_name=f"Documentacao_{_nome_loct_zip}.zip",
-                      mime="application/zip",
-                      use_container_width=True,
-                      key="ea_zip_todos"
+      if _docs_proc:
+          st.markdown("#### 📂 Documentos convertidos e renomeados")
+
+          _config_blocos = [
+              ("locatario", "👤 Locatário (Inquilino)", "#1565C0"),
+              ("locador",   "🏠 Locador (Proprietário)", "#2E7D32"),
+          ]
+          if st.session_state.get("ea_tem_fiador"):
+              _config_blocos.append(("fiador", "🤝 Fiador", "#6A1B9A"))
+
+          for _polo_b, _titulo_b, _cor_b in _config_blocos:
+              _arquivos_polo = _docs_por_polo.get(_polo_b, [])
+              with st.container(border=True):
+                  st.markdown(
+                      f"<div style='display:flex;align-items:center;justify-content:space-between;"
+                      f"margin-bottom:8px;'>"
+                      f"<span style='font-size:14px;font-weight:700;color:{_cor_b};'>{_titulo_b}</span>"
+                      f"<span style='font-size:12px;color:#5C6B7A;'>{len(_arquivos_polo)} arquivo(s)</span>"
+                      f"</div>",
+                      unsafe_allow_html=True
                   )
+                  if not _arquivos_polo:
+                      st.caption("— nenhum documento identificado para este polo")
+                  else:
+                      for _nd, _bd in _arquivos_polo:
+                          _cl, _cr = st.columns([6, 1])
+                          with _cl:
+                              st.markdown(
+                                  f"<div style='padding:5px 0;font-size:13px;'>📄 {_nd}</div>",
+                                  unsafe_allow_html=True
+                              )
+                          with _cr:
+                              st.download_button(
+                                  "⬇️",
+                                  data=_bd,
+                                  file_name=_nd,
+                                  mime="application/pdf",
+                                  key=f"dl_polo_{_polo_b}_{_nd}",
+                                  use_container_width=True
+                              )
+
+          # ZIP geral
+          if len(_docs_proc) > 1:
+              import zipfile, io as _io_zip
+              _zip_buf = _io_zip.BytesIO()
+              with zipfile.ZipFile(_zip_buf, "w") as _zf:
+                  for _polo_b, _, _ in _config_blocos:
+                      for _nd, _bd in _docs_por_polo.get(_polo_b, []):
+                          _zf.writestr(f"{_polo_b.upper()}/{_nd}", _bd)
+              _zip_buf.seek(0)
+              _nm_zip = (st.session_state.get("ea_dados_locatario", {}).get("nome_completo") or "cliente").split()[0]
+              st.download_button(
+                  f"⬇️ Baixar TODOS os documentos em ZIP — {len(_docs_proc)} arquivos",
+                  data=_zip_buf,
+                  file_name=f"Documentacao_{_nm_zip}.zip",
+                  mime="application/zip",
+                  use_container_width=True,
+                  key="ea_zip_todos"
+              )
 
       st.markdown("#### 👥 Dados extraídos")
 
