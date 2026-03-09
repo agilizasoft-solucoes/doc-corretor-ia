@@ -3022,7 +3022,12 @@ elif tipo_atendimento == "locacao":
                 pct += step
                 barra.progress(min(pct, 70), text=f"✅ {polo.capitalize()} extraído")
 
-        barra.progress(75, text="✉️ Montando email...")
+        barra.progress(70, text="🔄 Convertendo e renomeando documentos...")
+
+        # ── Renomear + converter via IA ──
+        docs_processados = processar_documentos(todos_bytes)
+
+        barra.progress(88, text="✉️ Montando email...")
 
         # Montar email
         dados_loct = resultados.get("locatario", {})
@@ -3056,6 +3061,7 @@ elif tipo_atendimento == "locacao":
         st.session_state["ea_todos_bytes"]      = [
             {"name": n, "bytes": b, "tipo": t} for n, b, t in todos_bytes
         ]
+        st.session_state["ea_docs_processados"]  = docs_processados  # [(nome, bytes_pdf), ...]
         st.rerun()
 
     # ── Tela de RESULTADO (após processar) ──
@@ -3079,6 +3085,53 @@ elif tipo_atendimento == "locacao":
       """, unsafe_allow_html=True)
 
       # ── Dados extraídos por polo ──
+      # ── Documentos processados ──
+      _docs_proc = st.session_state.get("ea_docs_processados", [])
+      if _docs_proc:
+          st.markdown("#### 📂 Documentos organizados")
+          with st.container(border=True):
+              st.markdown(
+                  f"<div style='font-size:13px;color:#1B5E20;font-weight:600;margin-bottom:10px;'>"
+                  f"✅ {len(_docs_proc)} arquivo(s) convertido(s) e renomeado(s) pela IA</div>",
+                  unsafe_allow_html=True
+              )
+              # Linha por arquivo: ícone + nome + botão baixar
+              for _nome_doc, _bytes_doc in _docs_proc:
+                  _col_nome, _col_dl = st.columns([5, 1])
+                  with _col_nome:
+                      st.markdown(
+                          f"<div style='padding:6px 0;font-size:13px;'>📄 {_nome_doc}</div>",
+                          unsafe_allow_html=True
+                      )
+                  with _col_dl:
+                      st.download_button(
+                          "⬇️",
+                          data=_bytes_doc,
+                          file_name=_nome_doc,
+                          mime="application/pdf",
+                          key=f"dl_ea_{_nome_doc}",
+                          use_container_width=True
+                      )
+
+              # ZIP com todos
+              if len(_docs_proc) > 1:
+                  import zipfile, io as _io
+                  _zip_buf = _io.BytesIO()
+                  with zipfile.ZipFile(_zip_buf, "w") as _zf:
+                      for _n, _b in _docs_proc:
+                          _zf.writestr(_n, _b)
+                  _zip_buf.seek(0)
+                  _nome_loct_zip = st.session_state.get("ea_dados_locatario", {}).get("nome_completo", "cliente")
+                  _nome_loct_zip = _nome_loct_zip.split()[0] if _nome_loct_zip else "cliente"
+                  st.download_button(
+                      f"⬇️ Baixar todos em ZIP ({len(_docs_proc)} arquivos)",
+                      data=_zip_buf,
+                      file_name=f"Documentacao_{_nome_loct_zip}.zip",
+                      mime="application/zip",
+                      use_container_width=True,
+                      key="ea_zip_todos"
+                  )
+
       st.markdown("#### 👥 Dados extraídos")
 
       _polos_result = [
@@ -3196,15 +3249,19 @@ elif tipo_atendimento == "locacao":
                       msg["Subject"] = _assunto
                       msg.attach(MIMEText(_corpo_sem_assunto, "plain", "utf-8"))
 
-                      # Anexar documentos
-                      _raw_bytes = st.session_state.get("ea_todos_bytes", [])
+                      # Anexar documentos processados (renomeados/convertidos)
+                      _docs_anexo = st.session_state.get("ea_docs_processados", [])
+                      # fallback: originais se processamento falhou
+                      if not _docs_anexo:
+                          _raw_bytes = st.session_state.get("ea_todos_bytes", [])
+                          _docs_anexo = [(_d["name"], _d["bytes"]) for _d in _raw_bytes]
                       from email.mime.base import MIMEBase
                       from email import encoders
-                      for _doc in _raw_bytes:
+                      for _doc_nome, _doc_bytes in _docs_anexo:
                           _part = MIMEBase("application","octet-stream")
-                          _part.set_payload(_doc["bytes"])
+                          _part.set_payload(_doc_bytes)
                           encoders.encode_base64(_part)
-                          _part.add_header("Content-Disposition","attachment",filename=_doc["name"])
+                          _part.add_header("Content-Disposition","attachment",filename=_doc_nome)
                           msg.attach(_part)
 
                       with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
