@@ -3022,40 +3022,35 @@ elif tipo_atendimento == "locacao":
                 pct += step
                 barra.progress(min(pct, 70), text=f"✅ {polo.capitalize()} extraído")
 
-        barra.progress(70, text="🔄 Convertendo e renomeando documentos por polo...")
+        # ── Dados extraídos pelos workers ──
+        dados_loct = resultados.get("locatario", {})
+        dados_locd = resultados.get("locador", {})
+        dados_fiad = resultados.get("fiador", {})
 
-        # ── Renomear + converter por polo ──
-        # O texto âncora diz quem é quem. A IA já extraiu os dados.
-        # Estratégia: processar_documentos separado por polo para manter organização.
-        # Como não há separação física dos arquivos por polo no upload único,
-        # processamos todos juntos mas depois agrupamos por nome identificado.
+        barra.progress(70, text="🔄 Convertendo e renomeando documentos...")
 
-        _nome_loct_norm = (dados_loct.get("nome_completo") or "").split()[0].lower() if dados_loct.get("nome_completo") else ""
-        _nome_locd_norm = (dados_locd.get("nome_completo") or "").split()[0].lower() if dados_locd.get("nome_completo") else ""
-        _nome_fiad_norm = (dados_fiad.get("nome_completo") or "").split()[0].lower() if dados_fiad.get("nome_completo") else ""
-
+        # ── Renomear + converter via IA, depois classificar por polo ──
         docs_todos = processar_documentos(todos_bytes)  # [(nome_final, bytes_pdf)]
 
-        # Classificar cada doc renomeado por polo pelo nome que a IA colocou
+        # Primeiro nome de cada polo para classificar os docs renomeados
+        _nome_loct_norm = (dados_loct.get("nome_completo") or "").split()[0].lower()
+        _nome_locd_norm = (dados_locd.get("nome_completo") or "").split()[0].lower()
+        _nome_fiad_norm = (dados_fiad.get("nome_completo") or "").split()[0].lower()
+
         def _polo_do_nome(nome_doc):
             n = nome_doc.lower()
-            if _nome_locd_norm and _nome_locd_norm in n:   return "locador"
-            if _nome_fiad_norm and _nome_fiad_norm in n:   return "fiador"
-            if _nome_loct_norm and _nome_loct_norm in n:   return "locatario"
-            return "locatario"  # default: locatário (quem mais tem docs)
+            if _nome_locd_norm and _nome_locd_norm in n: return "locador"
+            if _nome_fiad_norm and _nome_fiad_norm in n: return "fiador"
+            if _nome_loct_norm and _nome_loct_norm in n: return "locatario"
+            return "locatario"  # default: locatário
 
         docs_por_polo = {"locador": [], "locatario": [], "fiador": []}
         for _nd, _bd in docs_todos:
             docs_por_polo[_polo_do_nome(_nd)].append((_nd, _bd))
 
-        docs_processados = docs_todos  # lista flat para email
+        docs_processados = docs_todos  # lista flat para anexo no email
 
         barra.progress(88, text="✉️ Montando email...")
-
-        # Montar email
-        dados_loct = resultados.get("locatario", {})
-        dados_locd = resultados.get("locador", {})
-        dados_fiad = resultados.get("fiador", {})
 
         email_txt = gerar_email_locacao(
             {
